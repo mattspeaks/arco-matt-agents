@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { query, queryOne } from '../db/index.js';
 
@@ -72,10 +73,10 @@ export function routeStory(s: Pick<SnStory, 'short_description' | 'description'>
   return { tags, domain: null };
 }
 
-export async function saveSync(p: SyncPayload): Promise<{ stories: number; timeCards: number }> {
+export async function saveSync(p: SyncPayload, opts: { timesheetOnly?: boolean } = {}): Promise<{ stories: number; timeCards: number }> {
   const stories = p.stories.map((s) => ({ ...s, ...routeStory(s), tags: JSON.stringify(routeStory(s).tags) }));
 
-  await query(
+  if (!opts.timesheetOnly) await query(
     `MERGE dbo.stories AS t
      USING (SELECT * FROM OPENJSON(?) WITH (
         sys_id CHAR(32), number NVARCHAR(40), short_description NVARCHAR(400), description NVARCHAR(MAX),
@@ -131,6 +132,79 @@ export async function saveSync(p: SyncPayload): Promise<{ stories: number; timeC
     }
   }
   return { stories: stories.length, timeCards: p.time_cards.length };
+}
+
+/** Shapes the servicenow skill's snapshot recipes return (`references/reading.md`). */
+export interface BoardSnapshot {
+  __arco: 'board-v2';
+  stories: {
+    sys_id: string; number: string; title: string; state_value: string; state_label: string; priority: string;
+    assigned_to: string; sprint: string; points: string; updated: string; tags: string[];
+  }[];
+}
+export interface TimesheetSnapshot {
+  __arco: 'timesheet-v2';
+  sheet: { sys_id: string; week_starts_on: string; week_ends_on: string; state: string; total_hours: number } | null;
+  cards: SnTimeCard[];
+}
+
+function domainFor(tags: string[]): string | null {
+  const lower = tags.map((t) => t.toLowerCase());
+  for (const [domain, routeTags] of Object.entries(config.servicenow.routingTags)) {
+    if (routeTags.some((t) => lower.includes(t.toLowerCase()))) return domain;
+  }
+  return null;
+}
+
+/**
+ * The skill returns sys_ids dashed (the Chrome extension blanks bare 32-hex strings as "encoded data").
+ * Returns the plain 32-hex id, or null if it was blanked anyway.
+ */
+function snId(raw: string | null | undefined): string | null {
+  const id = String(raw ?? '').replace(/-/g, '').toLowerCase();
+  return /^[0-9a-f]{32}$/.test(id) ? id : null;
+}
+
+/** Saves a board snapshot read by the orchestrator. Descriptions aren't in it, so existing ones are kept. */
+export async function saveBoardSnapshot(p: BoardSnapshot): Promise<number> {
+  // Matched on the story number, so a blanked sys_id only matters for stories the app hasn't seen before.
+  const rows = p.stories
+    .filter((s) => /^[A-Z]+\d+$/.test(s.number))
+    .map((s) => ({ ...s, sys_id: snId(s.sys_id), tags: JSON.stringify(s.tags ?? []), domain: domainFor(s.tags ?? []) }));
+  await query(
+    `MERGE dbo.stories AS t
+     USING (SELECT * FROM OPENJSON(?) WITH (
+        sys_id CHAR(32), number NVARCHAR(40), title NVARCHAR(400), state_value NVARCHAR(40), state_label NVARCHAR(100),
+        priority NVARCHAR(100), assigned_to NVARCHAR(200), sprint NVARCHAR(200), points NVARCHAR(20), tags NVARCHAR(400),
+        domain NVARCHAR(20), updated NVARCHAR(40))) AS s
+     ON t.number = s.number
+     WHEN MATCHED THEN UPDATE SET sys_id = COALESCE(s.sys_id, t.sys_id), number = s.number, short_description = s.title, state_value = s.state_value,
+        state_label = s.state_label, priority = s.priority, assigned_to = s.assigned_to, sprint = s.sprint,
+        story_points = s.points, tags = s.tags, domain = s.domain, on_board = 1, sn_updated_on = s.updated, synced_at = SYSUTCDATETIME()
+     WHEN NOT MATCHED BY TARGET AND s.sys_id IS NOT NULL THEN INSERT (sys_id, number, short_description, state_value, state_label, priority,
+        assigned_to, sprint, story_points, tags, domain, on_board, sn_updated_on)
+        VALUES (s.sys_id, s.number, s.title, s.state_value, s.state_label, s.priority, s.assigned_to, s.sprint, s.points,
+        s.tags, s.domain, 1, s.updated)
+     WHEN NOT MATCHED BY SOURCE THEN UPDATE SET on_board = 0;`,
+    [JSON.stringify(rows)],
+  );
+  return rows.length;
+}
+
+/** Saves a timesheet snapshot read by the orchestrator (replaces that week's rows). */
+export async function saveTimesheetSnapshot(p: TimesheetSnapshot): Promise<number> {
+  if (!p.sheet) return 0;
+  // A blanked sheet id falls back to the stored sheet for that week; blanked card ids get a local key
+  // (the app only displays cards; changes are made live through the skill).
+  const known = await queryOne<{ sys_id: string }>('SELECT sys_id FROM dbo.timesheets WHERE week_starts_on = ?', [p.sheet.week_starts_on]);
+  const sheetId = snId(p.sheet.sys_id) ?? known?.sys_id;
+  if (!sheetId) throw new Error('Timesheet snapshot has no usable sheet id');
+  const cards = p.cards.map((c) => ({ ...c, sys_id: snId(c.sys_id) ?? randomUUID().replace(/-/g, '') }));
+  await saveSync(
+    { errors: [], board: { name: '', filter: '' }, choices: [], stories: [], timesheet: { ...p.sheet, sys_id: sheetId }, time_cards: cards },
+    { timesheetOnly: true },
+  );
+  return p.cards.length;
 }
 
 export async function listStories(filter: { lane?: string; domain?: string; search?: string; includeOffBoard?: boolean } = {}) {
@@ -193,8 +267,7 @@ export async function markStoryState(sysId: string, stateValue: string, stateLab
 }
 
 export async function lastSyncAt(): Promise<string | null> {
-  const row = await queryOne<{ ended_at: string }>(
-    `SELECT TOP 1 ended_at FROM dbo.runs WHERE kind = 'sync' AND status = 'succeeded' ORDER BY ended_at DESC`,
-  );
-  return row?.ended_at ?? null;
+  // The board snapshot stamps every on-board story, so the newest stamp is the last refresh.
+  const row = await queryOne<{ t: string | null }>('SELECT MAX(synced_at) AS t FROM dbo.stories WHERE on_board = 1');
+  return row?.t ?? null;
 }

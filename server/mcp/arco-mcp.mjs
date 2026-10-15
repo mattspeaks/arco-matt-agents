@@ -46,17 +46,8 @@ server.registerTool(
 
 server.registerTool(
   'get_timesheet',
-  { description: "Matt's current-week ServiceNow timesheet (rows per task with daily hours). Read it before proposing a timesheet entry." },
+  { description: "The app's local copy of Matt's current-week timesheet (rows per task with daily hours). Read live with the servicenow skill before changing hours." },
   () => call('get_timesheet'),
-);
-
-server.registerTool(
-  'sync_servicenow',
-  {
-    description:
-      'Refresh the local board + timesheet copy from ServiceNow through the browser (~1 min). Use when data may be stale (see synced_at) or after Matt changes the board.',
-  },
-  () => call('sync_servicenow'),
 );
 
 server.registerTool('list_workers', { description: 'Available worker agents, what they do, and whether they need approval to start.' }, () =>
@@ -91,35 +82,6 @@ server.registerTool(
     inputSchema: { run_id: z.string(), timeout_seconds: z.number().int().min(5).max(840).optional() },
   },
   (args) => call('wait_for_run', args),
-);
-
-server.registerTool(
-  'propose_servicenow_update',
-  {
-    description:
-      'Propose moving a story to another lane and/or adding a work note. Creates an approval card for Matt; nothing changes in ServiceNow until he approves. Agents may never move stories to Done-type lanes.',
-    inputSchema: {
-      story_number: z.string(),
-      new_state: z.string().optional().describe('Target lane label'),
-      work_note: z.string().optional().describe('Use the work note template from the servicenow skill'),
-    },
-  },
-  (args) => call('propose_servicenow_update', args),
-);
-
-server.registerTool(
-  'propose_timesheet_entry',
-  {
-    description:
-      "Propose setting the hours for one day on one row of Matt's own ServiceNow timesheet (current or previous week). Updates the matching row or creates it. `hours` is the day's NEW TOTAL for that row, not an amount to add: read get_timesheet first and add to the current value if Matt says 'add'. Creates an approval card; nothing changes until Matt approves. Never submits the timesheet.",
-    inputSchema: {
-      task_number: z.string().optional().describe('Story/task number, e.g. STRY0024063. Omit for non-task rows.'),
-      category: z.string().optional().describe('Row category label, e.g. "Task work" (default for tasks), "Admin", "Meeting". Required when task_number is omitted.'),
-      day: z.string().describe('Weekday name for this week (e.g. "wednesday"), "today", or YYYY-MM-DD'),
-      hours: z.number().min(0).max(24).describe('New total hours for that day on that row, quarter-hour steps'),
-    },
-  },
-  (args) => call('propose_timesheet_entry', args),
 );
 
 server.registerTool(

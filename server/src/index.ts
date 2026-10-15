@@ -6,11 +6,9 @@ import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
 import { decide, listApprovals, createApproval } from './approvals.js';
 import { proposeLesson } from './lessons.js';
-import { createConversation, getMessages, listConversations, sendMessage } from './orchestrator.js';
+import { createConversation, getMessages, listConversations, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getStory, lastSyncAt, listStories } from './servicenow/store.js';
-import { startSync, validateStoryUpdate } from './servicenow/sync.js';
-import { describeTimeEntry, resolveTimeEntry } from './servicenow/timesheet.js';
 import { listWorkers, requestWorker } from './workers.js';
 
 await initDb();
@@ -51,10 +49,9 @@ app.get('/api/board', async () => {
 
 app.get('/api/timesheet', async () => getCurrentTimesheet());
 
-app.post('/api/sync', async () => {
-  const { runId } = await startSync();
-  return { runId };
-});
+// Matt's Sync button: posts a visible request from him into the "ServiceNow refresh" chat, and the orchestrator
+// reads the board and timesheet there. Nothing reads ServiceNow without a message from Matt.
+app.post('/api/sync', async () => requestRefresh());
 
 app.get<{ Querystring: { limit?: string } }>('/api/runs', async (req) => listRuns(Number(req.query.limit ?? 60)));
 
@@ -115,12 +112,6 @@ app.post<{ Body: AgentBody }>('/api/agent/get_story', async (req) => {
 
 app.post('/api/agent/get_timesheet', async () => getCurrentTimesheet());
 
-app.post<{ Body: AgentBody }>('/api/agent/sync_servicenow', async (req) => {
-  const { done } = await startSync(req.body.parentRunId);
-  return done;
-});
-
-app.post('/api/agent/list_workers', async () => listWorkers());
 
 app.post<{ Body: AgentBody }>('/api/agent/start_worker', async (req) => {
   const worker = str(req.body.worker);
@@ -138,32 +129,6 @@ app.post<{ Body: AgentBody }>('/api/agent/get_run', async (req) => runSummary(aw
 app.post<{ Body: AgentBody }>('/api/agent/wait_for_run', async (req) => {
   const timeout = Math.min(Number(req.body.timeout_seconds ?? 600), 840) * 1000;
   return runSummary(await waitForRun(String(req.body.run_id), timeout));
-});
-
-app.post<{ Body: AgentBody }>('/api/agent/propose_servicenow_update', async (req) => {
-  const request = { story_number: String(req.body.story_number ?? ''), new_state: str(req.body.new_state), work_note: str(req.body.work_note) };
-  const problem = await validateStoryUpdate(request);
-  if (problem) throw bad(problem);
-  const parts = [request.new_state && `→ ${request.new_state}`, request.work_note && 'work note'].filter(Boolean).join(' + ');
-  const approval = await createApproval({
-    kind: 'sn_write',
-    title: `ServiceNow: ${request.story_number} ${parts}`,
-    payload: request,
-    requestedByRunId: req.body.parentRunId,
-  });
-  return { approval_id: approval.id, status: 'pending', note: 'Waiting for Matt to approve in the UI. Nothing has changed in ServiceNow yet.' };
-});
-
-app.post<{ Body: AgentBody }>('/api/agent/propose_timesheet_entry', async (req) => {
-  const entry = await resolveTimeEntry({
-    task_number: str(req.body.task_number),
-    category: str(req.body.category),
-    day: String(req.body.day ?? ''),
-    hours: Number(req.body.hours),
-  });
-  if (typeof entry === 'string') throw bad(entry);
-  const approval = await createApproval({ kind: 'timesheet_write', title: describeTimeEntry(entry), payload: entry, requestedByRunId: req.body.parentRunId });
-  return { approval_id: approval.id, status: 'pending', entry, note: 'Waiting for Matt to approve in the UI. Nothing has changed in ServiceNow yet.' };
 });
 
 app.post<{ Body: AgentBody }>('/api/agent/propose_lesson', async (req) => {

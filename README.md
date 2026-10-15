@@ -27,11 +27,12 @@ Open http://127.0.0.1:5173, click **Sync ServiceNow**, then talk to the orchestr
 
 ## While it's running
 
-- Browser jobs (sync, approved ServiceNow writes) take about a minute and open a tab in a Chrome tab group.
-  Don't run another Claude Code session that uses Chrome at the same time: Windows allows one Chrome connection.
+- When the orchestrator works in ServiceNow, it opens a tab in a Chrome tab group and closes it when done. Don't run
+  another Claude Code session that uses Chrome at the same time: Windows allows one Chrome connection.
 - Agent runs count against your Claude plan's usage limits. The "est. $" figures are Claude Code's estimates, not
   bills.
-- Debug a sync without the UI: `cd server; npx tsx src/dev/sync-once.ts`
+- ServiceNow work happens in the chat. **Sync ServiceNow** posts a request from you into the "ServiceNow refresh"
+  chat. Changes (lane moves, work notes, hours) are previewed in chat, and nothing is saved until you reply "yes".
 
 ## Where things live
 
@@ -42,5 +43,5 @@ Open http://127.0.0.1:5173, click **Sync ServiceNow**, then talk to the orchestr
 | Worker prompts | `.claude/agents/*.md` |
 | Standards the workers follow | `.claude/skills/*` |
 | Approved lessons | `memory/*-lessons.md` |
-| ServiceNow reads (vetted read-only scripts) | `server/src/servicenow/snippets.ts` |
-| ServiceNow writes (step-by-step UI instructions) | `server/src/servicenow/timesheet.ts`, `sync.ts` (`applyStoryUpdate`), `chrome.ts` (`runChromeUiTask`) |
+| How the orchestrator reads and updates ServiceNow | `.claude/skills/servicenow/` |
+| Hard limits on ServiceNow writes | `server/hooks/sn-write-guard.mjs` |

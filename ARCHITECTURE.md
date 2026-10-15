@@ -124,14 +124,13 @@ needs approval) is in `config/app.config.json` and is enforced by the runner thr
 
 ### 3.3 Approvals
 
-Approvals are the human checkpoint. The orchestrator can only *propose* the following; Matt approves or rejects in
-the UI, and only then does the app act:
+Approvals are the human checkpoint. ServiceNow changes are approved **in chat**: the orchestrator previews them, and
+Matt replies "yes" (§4.1). The orchestrator can only *propose* the following; Matt approves or rejects them in the UI,
+and only then does the app act:
 
 | Kind | Created by | On approve |
 |---|---|---|
 | `start_worker` | `start_worker` for a write-capable worker | Worker run starts |
-| `sn_write` | `propose_servicenow_update` | A browser session sets State and/or adds the work note on the story form, then a sync verifies the result |
-| `timesheet_write` | `propose_timesheet_entry` | A browser session types the hours into the Time Sheet Portal, then a sync verifies the result |
 | `lesson` | `propose_lesson` | Appended to `memory/<worker>-lessons.md` |
 
 ### 3.4 Skills and lessons
@@ -146,30 +145,27 @@ installed.
 
 ### 4.1 Access method
 
-Access goes through **Claude in Chrome on Matt's browser session**, with no integration user or OAuth app.
+Access goes through **Claude in Chrome on Matt's browser session**, with no integration user or OAuth app. It
+follows the same pattern as the team's shared `servicenow-agile-board` skill: **the conversation Matt is typing in
+does the work itself.**
 
-**Reads:** a headless Claude session (`claude -p --chrome`) opens the instance in Matt's Chrome and runs **one
-vetted, read-only JavaScript snippet** (`server/src/servicenow/snippets.ts`). The snippet calls the **REST Table
-API from inside the page**, using the session token (`X-UserToken: g_ck`). The results are JSON, not
-screen-scraped HTML, so a UI change doesn't break the sync.
-
-**Writes go through the UI, the way Matt would make them by hand** (`runChromeUiTask` in `chrome.ts`). A script
-that sends write requests with the page's session token looks like cross-site scripting, and Claude Code's auto
-mode classifier blocks it. So after Matt approves a change, a headless session with **no `javascript_tool`**
-follows click-by-click steps the app generates: for a timesheet entry, in the Time Sheet Portal; for a story
-update, on the story form. The app then **runs a sync and checks** that the value really changed, instead of
-trusting the session's reply. Every browser job closes its tab when it finishes. This stays in place until there's
-an integration account or API access for writes.
-
-- Agents never write their own ServiceNow requests. Reads are fixed GETs. Writes are generated, step-by-step UI
-  instructions for one approved change.
-- The payload is read straight from the tool result in the stream, so the model never re-types data.
-- **Extension constraints we work around:** results are capped at 50 KB (we chunk them), each string is capped at
-  1000 chars (we split chunks into pieces), and text that looks like cookies or query strings is blanked (we
-  escape `= & ; ?` as JSON `\uXXXX`).
-- Only one Claude session can hold the Chrome connection on Windows, so browser jobs are serialized and everything
-  else reads the local copy in SQL Server.
-- If the session expires, the bot reports `LOGIN_REQUIRED` and Matt logs in again in Chrome.
+- **Where:** the orchestrator chat session uses Claude in Chrome directly, in response to Matt's own messages.
+  No background session touches ServiceNow. Sessions with no user present that operate his logged-in browser are
+  what Claude Code's safety classifier blocks, and rightly so.
+- **How:** the `servicenow` skill (`.claude/skills/servicenow/`) defines a small `window.SN` fetch helper in a
+  ServiceNow tab. Each step is then one short, readable REST Table API call, authenticated by the page's session
+  token (`g_ck`).
+- **Writes:** resolve → preview in chat → **Matt's explicit "yes"** → re-check `sys_updated_on` → PATCH/POST →
+  verify the returned record → refresh the snapshot.
+- **Guard:** `server/hooks/sn-write-guard.mjs` is a PreToolUse hook on `javascript_tool`. It blocks DELETE/PUT,
+  writes to tables other than `rm_story`/`time_card`, story states outside `agentAllowedStateValues`, and any change
+  to `time_sheet` or a time card's `state`, whatever the model writes.
+- **Dashboard copy:** the skill's snapshot recipes return `{ __arco: 'board-v2' | 'timesheet-v2', … }`. The server
+  saves those results from the chat's stream into SQL Server. **Sync ServiceNow** in the UI posts a visible request
+  from Matt into the "ServiceNow refresh" chat.
+- Only one Claude session can hold the Chrome connection on Windows, so orchestrator turns are serialized.
+- When the session expires, the orchestrator asks Matt to sign in. It never enters credentials.
+- Long term: an integration account or OAuth client would let the app call the API directly.
 
 Instance: `arcoconstruction.service-now.com`. Board: **ABS Data and Analytics: Current Sprint**
 (`vtb_board` `423702ce837b0350cc2a47447daad34e`). It's a guided board over **`rm_story`**, laned by `state` and
@@ -202,8 +198,8 @@ stateDiagram-v2
 | Agent Review | Ready for testing |
 | Done | Testing / Deploy/Launch / Complete. **Matt only** |
 
-`agentAllowedTargetStates` in `config/app.config.json` is the allow-list, checked when a proposal is made and
-again when it executes.
+`agentAllowedStateValues` in `config/app.config.json` is the allow-list (2 = Work in progress, -7 = Ready for testing).
+The write guard enforces it.
 
 ### 4.4 Work note template
 
@@ -222,15 +218,13 @@ Needs:     <decision or approval required from Matt>
 with `sunday`…`saturday`, `total`, `category`, `task` and `top_task`. The sync pulls the current week. The UI
 shows it and puts each story's hours next to its card, and the orchestrator can read it with `get_timesheet`.
 
-The orchestrator writes time with `propose_timesheet_entry`, which creates a `timesheet_write` approval card. Each
-entry sets one day's total for one row: a story or task, or a category such as Admin or Meeting. Because it sets a
-value rather than adding one, retrying can't log the same hours twice. When Matt approves, a browser session
-types the hours into the Time Sheet Portal, adding the task's row from the Tasks panel if needed. A sync then
-confirms the new value. Guardrails:
-- Matt's own timesheet only, and only for the current or previous week.
-- Pending sheets and cards only.
+The orchestrator reads and changes hours with the `servicenow` skill (`references/writing.md`), previewed in chat
+and confirmed by Matt's "yes". Each entry sets one day's total for one row: a story or task, or a category such
+as Admin or Meeting. Guardrails:
+- Matt's own timesheet only.
+- Pending sheets only.
 - Hours go in quarter-hour steps, with no more than 24h in a day.
-- Agents never submit the timesheet.
+- Agents never submit the timesheet, and the write guard blocks any change to `time_sheet` or a card's state.
 
 ---
 
@@ -273,7 +267,7 @@ arco-matt-agents/
 │   ├── src/orchestrator.ts         # chat → resumed orchestrator session
 │   ├── src/workers.ts              # worker registry, approval gating, worker runs
 │   ├── src/approvals.ts · lessons.ts · runs.ts
-│   ├── src/servicenow/             # snippets (vetted JS), chrome.ts (browser jobs), sync.ts, store.ts
+│   ├── src/servicenow/             # chrome.ts (Chrome mutex, snapshot capture), store.ts; hooks/sn-write-guard.mjs
 │   ├── src/db/                     # SQL Server (msnodesqlv8/ODBC), idempotent schema
 │   └── mcp/arco-mcp.mjs            # orchestrator tools → local API
 ├── web/                            # React + Vite UI
@@ -300,19 +294,20 @@ sequenceDiagram
 
     Matt->>UI: "Check the board"
     UI->>O: chat turn
-    O->>A: sync_servicenow / list_stories(domain=pbi)
-    A->>SN: vetted GETs in Matt's session
+    O->>SN: servicenow skill: board snapshot (GETs in Matt's session)
+    O-->>A: snapshot saved from the stream
     O->>Matt: plan + questions
     Matt->>O: go
-    O->>A: propose_servicenow_update(→ Work in progress)
-    Matt->>UI: Approve
-    A->>SN: PATCH state
+    O->>Matt: preview: STRY → Work in progress
+    Matt->>O: yes
+    O->>SN: PATCH state (checked by the write guard)
     O->>A: start_worker(pbi-builder)
     Matt->>UI: Approve start
     A->>B: run (branch, edit, commit)
     O->>A: wait_for_run → start_worker(pbi-qc) → wait_for_run
-    O->>A: propose_servicenow_update(→ Ready for testing + work note)
-    Matt->>UI: Approve
+    O->>Matt: preview: → Ready for testing + work note
+    Matt->>O: yes
+    O->>SN: PATCH state + work note
     O->>Matt: Ready for your review
 ```
 
@@ -323,7 +318,7 @@ sequenceDiagram
 | Area | Control |
 |---|---|
 | Production | No PROD credentials; never publish or update Power BI apps (Matt does) |
-| ServiceNow | Agents only propose. Writes are limited to `state` (allow-listed lanes) and `work_notes`, through vetted snippets, after Matt approves |
+| ServiceNow | Done only in the chat Matt is typing in, never by background sessions. Every write is previewed and needs Matt's "yes". The write guard hook blocks other lanes, deletes, other tables, and timesheet submission |
 | Git | Builder commits to `agent/*` branches only; push, merge, reset and rebase are denied; Matt merges |
 | QC | The orchestrator must run QC after every builder run before proposing review |
 | Rework | At most 2 build → QC loops, then escalate to Matt |

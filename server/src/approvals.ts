@@ -3,8 +3,6 @@ import { publish } from './bus.js';
 import { query, queryOne } from './db/index.js';
 import { approveLesson, rejectLesson } from './lessons.js';
 import { updateRun } from './runs.js';
-import { applyStoryUpdate, type StoryUpdateRequest } from './servicenow/sync.js';
-import { applyTimeEntry, type ResolvedTimeEntry } from './servicenow/timesheet.js';
 import { startWorkerRun } from './workers.js';
 
 export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'lesson';
@@ -77,18 +75,9 @@ export async function decide(id: string, approve: boolean, note?: string): Promi
     } else {
       await updateRun(payload.runId, { status: 'cancelled', error: `Rejected by Matt${note ? `: ${note}` : ''}`, ended: true });
     }
-  } else if (approval.kind === 'sn_write') {
-    if (approve) {
-      void applyStoryUpdate(payload as StoryUpdateRequest, id)
-        .then((r) => setOutcome(id, r.summary))
-        .catch((err) => setOutcome(id, `Failed: ${err instanceof Error ? err.message : err}`));
-    }
-  } else if (approval.kind === 'timesheet_write') {
-    if (approve) {
-      void applyTimeEntry(payload as ResolvedTimeEntry, id)
-        .then((r) => setOutcome(id, r.ok ? r.summary : `Failed: ${r.summary}`))
-        .catch((err) => setOutcome(id, `Failed: ${err instanceof Error ? err.message : err}`));
-    }
+  } else if (approval.kind === 'sn_write' || approval.kind === 'timesheet_write') {
+    // Retired: ServiceNow changes are now previewed in chat and confirmed with Matt's "yes" there.
+    await setOutcome(id, 'Retired card type: ask the orchestrator in chat to make this change.');
   } else if (approval.kind === 'lesson') {
     if (approve) await setOutcome(id, await approveLesson(payload.lessonId));
     else await rejectLesson(payload.lessonId);

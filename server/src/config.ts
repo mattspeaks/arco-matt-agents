@@ -27,6 +27,7 @@ export interface AppConfig {
     routingTags: Record<string, string[]>;
     lanes: { ready: string; agentInProgress: string; agentReview: string };
     agentAllowedTargetStates: string[];
+    agentAllowedStateValues: string[];
     laneOrder: string[];
   };
   claude: { bin: string; syncModel: string; orchestratorModel: string; defaultWorkerModel: string };

@@ -25,6 +25,8 @@ export interface ClaudeRunOptions {
   allowedTools?: string[];
   disallowedTools?: string[];
   env?: Record<string, string>;
+  /** Extra settings for this session (e.g. hooks), passed with --settings. */
+  settings?: object;
   /** Raw stream-json messages, for callers that need tool results verbatim (e.g. ServiceNow sync). */
   onMessage?: (msg: StreamMessage) => void;
 }
@@ -90,6 +92,7 @@ export function runClaude(o: ClaudeRunOptions): Promise<ClaudeRunResult> {
   if (o.appendSystemPrompt) args.push('--append-system-prompt-file', tmp('system.md', o.appendSystemPrompt));
   if (o.mcpConfig) args.push('--mcp-config', tmp('mcp.json', JSON.stringify(o.mcpConfig)));
   if (o.strictMcp) args.push('--strict-mcp-config');
+  if (o.settings) args.push('--settings', tmp('settings.json', JSON.stringify(o.settings)));
   if (o.chrome) args.push('--chrome');
   if (o.resumeSessionId) args.push('--resume', o.resumeSessionId);
   if (o.permissionMode) args.push('--permission-mode', o.permissionMode);
