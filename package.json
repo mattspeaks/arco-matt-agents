@@ -1,0 +1,14 @@
+{
+  "name": "arco-matt-agents",
+  "private": true,
+  "type": "module",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
+    "db:init": "npm run db:init -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

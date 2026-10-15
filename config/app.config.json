@@ -1,0 +1,54 @@
+{
+  "server": {
+    "port": 4317
+  },
+  "servicenow": {
+    "instanceUrl": "https://arcoconstruction.service-now.com",
+    "boardSysId": "423702ce837b0350cc2a47447daad34e",
+    "storyTable": "rm_story",
+    "routingTags": {
+      "pbi": ["#PowerBI", "#Report", "#SemanticModel"],
+      "dwh": ["#NewTable", "#DWH", "#Pipeline"]
+    },
+    "lanes": {
+      "ready": "Ready",
+      "agentInProgress": "Work in progress",
+      "agentReview": "Ready for testing"
+    },
+    "agentAllowedTargetStates": ["Work in progress", "Ready for testing"],
+    "laneOrder": [
+      "Backlog",
+      "Draft",
+      "Ready",
+      "Work in progress",
+      "Ready for testing",
+      "Testing",
+      "Deploy/Launch",
+      "Complete",
+      "Cancelled"
+    ]
+  },
+  "claude": {
+    "bin": "claude",
+    "syncModel": "sonnet",
+    "orchestratorModel": "opus",
+    "defaultWorkerModel": "sonnet"
+  },
+  "projectRoots": ["C:/Users/mspeaks/source/repos"],
+  "workers": {
+    "pbi-qc": {
+      "domain": "pbi",
+      "requiresApproval": false,
+      "readOnly": true,
+      "allowedTools": ["Read", "Grep", "Glob", "Skill"],
+      "disallowedTools": ["Edit", "Write", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task", "Agent"]
+    },
+    "pbi-builder": {
+      "domain": "pbi",
+      "requiresApproval": true,
+      "readOnly": false,
+      "allowedTools": ["Read", "Grep", "Glob", "Skill", "Edit", "Write", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git branch:*)", "Bash(git switch:*)", "Bash(git checkout -b:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git -C:*)"],
+      "disallowedTools": ["Bash(git push:*)", "Bash(git merge:*)", "Bash(git reset:*)", "Bash(git rebase:*)", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Agent"]
+    }
+  }
+}
