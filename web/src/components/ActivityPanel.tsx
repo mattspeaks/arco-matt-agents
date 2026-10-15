@@ -106,7 +106,13 @@ function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: 
   return (
     <div className={`approval ${approval.kind}`}>
       <div className="approval-kind small">
-        {approval.kind === 'sn_write' ? 'ServiceNow change' : approval.kind === 'start_worker' ? 'Start worker' : 'New lesson'}
+        {approval.kind === 'sn_write'
+          ? 'ServiceNow change'
+          : approval.kind === 'timesheet_write'
+            ? 'Timesheet entry'
+            : approval.kind === 'start_worker'
+              ? 'Start worker'
+              : 'New lesson'}
       </div>
       <div className="approval-title">{approval.title}</div>
       {approval.kind === 'sn_write' && (
@@ -127,6 +133,20 @@ function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: 
               </dd>
             </>
           )}
+        </dl>
+      )}
+      {approval.kind === 'timesheet_write' && (
+        <dl className="kv small">
+          <dt>Row</dt>
+          <dd className="mono">{[p.task_number, p.category].filter(Boolean).join(' · ') || '–'}</dd>
+          <dt>Day</dt>
+          <dd>
+            {p.day} {p.date}
+          </dd>
+          <dt>Hours</dt>
+          <dd>
+            {p.current_hours ?? '?'}h → <strong>{p.hours}h</strong>
+          </dd>
         </dl>
       )}
       {approval.kind === 'start_worker' && (

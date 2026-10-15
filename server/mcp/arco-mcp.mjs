@@ -46,7 +46,7 @@ server.registerTool(
 
 server.registerTool(
   'get_timesheet',
-  { description: "Matt's current-week ServiceNow timesheet (rows per task with daily hours)." },
+  { description: "Matt's current-week ServiceNow timesheet (rows per task with daily hours). Read it before proposing a timesheet entry." },
   () => call('get_timesheet'),
 );
 
@@ -105,6 +105,21 @@ server.registerTool(
     },
   },
   (args) => call('propose_servicenow_update', args),
+);
+
+server.registerTool(
+  'propose_timesheet_entry',
+  {
+    description:
+      "Propose setting the hours for one day on one row of Matt's own ServiceNow timesheet (current or previous week). Updates the matching row or creates it. `hours` is the day's NEW TOTAL for that row, not an amount to add: read get_timesheet first and add to the current value if Matt says 'add'. Creates an approval card; nothing changes until Matt approves. Never submits the timesheet.",
+    inputSchema: {
+      task_number: z.string().optional().describe('Story/task number, e.g. STRY0024063. Omit for non-task rows.'),
+      category: z.string().optional().describe('Row category label, e.g. "Task work" (default for tasks), "Admin", "Meeting". Required when task_number is omitted.'),
+      day: z.string().describe('Weekday name for this week (e.g. "wednesday"), "today", or YYYY-MM-DD'),
+      hours: z.number().min(0).max(24).describe('New total hours for that day on that row, quarter-hour steps'),
+    },
+  },
+  (args) => call('propose_timesheet_entry', args),
 );
 
 server.registerTool(

@@ -4,9 +4,10 @@ import { query, queryOne } from './db/index.js';
 import { approveLesson, rejectLesson } from './lessons.js';
 import { updateRun } from './runs.js';
 import { applyStoryUpdate, type StoryUpdateRequest } from './servicenow/sync.js';
+import { applyTimeEntry, type ResolvedTimeEntry } from './servicenow/timesheet.js';
 import { startWorkerRun } from './workers.js';
 
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'lesson';
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'lesson';
 
 export interface Approval {
   id: string;
@@ -80,6 +81,12 @@ export async function decide(id: string, approve: boolean, note?: string): Promi
     if (approve) {
       void applyStoryUpdate(payload as StoryUpdateRequest, id)
         .then((r) => setOutcome(id, r.summary))
+        .catch((err) => setOutcome(id, `Failed: ${err instanceof Error ? err.message : err}`));
+    }
+  } else if (approval.kind === 'timesheet_write') {
+    if (approve) {
+      void applyTimeEntry(payload as ResolvedTimeEntry, id)
+        .then((r) => setOutcome(id, r.ok ? r.summary : `Failed: ${r.summary}`))
         .catch((err) => setOutcome(id, `Failed: ${err instanceof Error ? err.message : err}`));
     }
   } else if (approval.kind === 'lesson') {

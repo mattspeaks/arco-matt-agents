@@ -10,6 +10,7 @@ import { createConversation, getMessages, listConversations, sendMessage } from 
 import { getRun, listRunEvents, listRuns, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getStory, lastSyncAt, listStories } from './servicenow/store.js';
 import { startSync, validateStoryUpdate } from './servicenow/sync.js';
+import { describeTimeEntry, resolveTimeEntry } from './servicenow/timesheet.js';
 import { listWorkers, requestWorker } from './workers.js';
 
 await initDb();
@@ -151,6 +152,18 @@ app.post<{ Body: AgentBody }>('/api/agent/propose_servicenow_update', async (req
     requestedByRunId: req.body.parentRunId,
   });
   return { approval_id: approval.id, status: 'pending', note: 'Waiting for Matt to approve in the UI. Nothing has changed in ServiceNow yet.' };
+});
+
+app.post<{ Body: AgentBody }>('/api/agent/propose_timesheet_entry', async (req) => {
+  const entry = await resolveTimeEntry({
+    task_number: str(req.body.task_number),
+    category: str(req.body.category),
+    day: String(req.body.day ?? ''),
+    hours: Number(req.body.hours),
+  });
+  if (typeof entry === 'string') throw bad(entry);
+  const approval = await createApproval({ kind: 'timesheet_write', title: describeTimeEntry(entry), payload: entry, requestedByRunId: req.body.parentRunId });
+  return { approval_id: approval.id, status: 'pending', entry, note: 'Waiting for Matt to approve in the UI. Nothing has changed in ServiceNow yet.' };
 });
 
 app.post<{ Body: AgentBody }>('/api/agent/propose_lesson', async (req) => {

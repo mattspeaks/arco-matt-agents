@@ -83,7 +83,7 @@ export interface RunEvent {
 
 export interface Approval {
   id: string;
-  kind: 'start_worker' | 'sn_write' | 'lesson';
+  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'lesson';
   title: string;
   payload: string;
   status: 'pending' | 'approved' | 'rejected';

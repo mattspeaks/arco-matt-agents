@@ -206,12 +206,20 @@ Branch/PR: <link>
 Needs:     <decision or approval required from Matt>
 ```
 
-### 4.5 Timesheet (read-only in v1)
+### 4.5 Timesheet
 
 `time_sheet` holds one row per user per week (weeks start Sunday). `time_card` holds one row per task per week,
 with `sunday`…`saturday`, `total`, `category`, `task` and `top_task`. The sync pulls the current week. The UI
 shows it and puts each story's hours next to its card, and the orchestrator can read it with `get_timesheet`.
-Drafting time entries for approval is a later phase.
+
+The orchestrator writes time with `propose_timesheet_entry`, which creates a `timesheet_write` approval card. Each
+entry sets one day's total for one row: a story or task, or a category such as Admin or Meeting. Because it sets a
+value rather than adding one, retrying can't log the same hours twice. When Matt approves, `timeEntrySnippet`
+updates the matching `time_card` or creates one, and the local copy is updated to match. Guardrails:
+- Matt's own timesheet only, and only for the current or previous week.
+- Pending sheets and cards only.
+- Hours go in quarter-hour steps, with no more than 24h in a day.
+- Agents never submit the timesheet.
 
 ---
 
