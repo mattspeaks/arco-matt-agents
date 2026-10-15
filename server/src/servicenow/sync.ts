@@ -2,9 +2,9 @@ import { publish } from '../bus.js';
 import { config } from '../config.js';
 import { finishRun } from '../claude/runner.js';
 import { addEvent, createRun, type Run } from '../runs.js';
-import { runChromeScript } from './chrome.js';
-import { storyWriteSnippet, syncSnippet, SYNC_MARKER, WRITE_MARKER } from './snippets.js';
-import { getStory, markStoryState, saveSync, stateValueFor, type SyncPayload } from './store.js';
+import { runChromeScript, runChromeUiTask } from './chrome.js';
+import { syncSnippet, SYNC_MARKER } from './snippets.js';
+import { getStory, saveSync, stateValueFor, type SyncPayload } from './store.js';
 
 export interface SyncOutcome {
   runId: string;
@@ -73,7 +73,7 @@ export async function validateStoryUpdate(req: StoryUpdateRequest): Promise<stri
   return null;
 }
 
-/** Executes an approved story update in the browser session. */
+/** Makes an approved story update through the story form in the ServiceNow UI, then verifies the lane with a sync. */
 export async function applyStoryUpdate(req: StoryUpdateRequest, approvalId: string): Promise<SyncOutcome> {
   const problem = await validateStoryUpdate(req);
   const run = await createRun({ kind: 'sn_write', title: `Update ${req.story_number}`, storyNumber: req.story_number, meta: { approvalId, ...req } });
@@ -82,25 +82,43 @@ export async function applyStoryUpdate(req: StoryUpdateRequest, approvalId: stri
     return { runId: run.id, ok: false, summary: problem };
   }
   const story = (await getStory(req.story_number))!;
-  const body: { state?: string; work_notes?: string } = {};
-  if (req.new_state) body.state = await stateValueFor(req.new_state);
-  if (req.work_note) body.work_notes = req.work_note;
+  const sn = config.servicenow;
+  const changes = [req.new_state && `set State to "${req.new_state}"`, req.work_note && 'add the work note below'].filter(Boolean).join(' and ');
+  const steps = [
+    `2. Check the form is story ${req.story_number} ("${story.short_description}"). If not, reply FAILED.`,
+    req.new_state && `3. Set the "State" field to "${req.new_state}". Change no other field.`,
+    req.work_note &&
+      `4. Find the "Work notes" field (in the activity / notes section; NOT "Additional comments", which the customer can see) and type exactly this text:\n---\n${req.work_note}\n---`,
+    `5. Click the form's "Save" button (or "Update"). Confirm there's no error message and the form shows the change${req.work_note ? ' (the note appears in the activity stream)' : ''}.`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  const code = storyWriteSnippet({ storyTable: config.servicenow.storyTable, sysId: story.sys_id, body });
-  const { run: res, payload } = await runChromeScript<{ status: number; state_value: string; state_label: string; error: string | null }>(
-    run.id,
-    WRITE_MARKER,
-    code,
-    `approved update to ${req.story_number}`,
-  );
-  if (!payload || payload.status >= 300) {
-    const error = payload?.error ?? res.error ?? 'Write result not found in the browser session output.';
-    await finishRun(run.id, res, { ok: false, error });
+  const ui = await runChromeUiTask(run.id, {
+    change: `On ServiceNow story ${req.story_number}: ${changes}.`,
+    approvalId,
+    landingUrl: `${sn.instanceUrl}/${sn.storyTable}.do?sys_id=${story.sys_id}`,
+    steps,
+  });
+  if (ui.status !== 'DONE') {
+    const error = ui.status === 'LOGIN_REQUIRED' ? 'ServiceNow login required: log in in Chrome, then approve again.' : ui.detail;
+    await finishRun(run.id, ui.run, { ok: false, error });
     return { runId: run.id, ok: false, summary: error };
   }
-  if (payload.state_value) await markStoryState(story.sys_id, payload.state_value, payload.state_label);
-  const summary = `${req.story_number} updated${req.new_state ? ` → ${payload.state_label}` : ''}${req.work_note ? ' (work note added)' : ''}`;
-  await finishRun(run.id, { ...res, result: summary }, { ok: true });
+
+  let summary = `${req.story_number}: ${ui.detail}`;
+  if (req.new_state) {
+    await addEvent(run.id, 'text', `Browser session reports: ${ui.detail}. Verifying the lane with a sync…`);
+    const sync = await (await startSync(run.id)).done;
+    const fresh = await getStory(req.story_number);
+    if (sync.ok && fresh && fresh.state_label !== req.new_state) {
+      const error = `The browser session reported success, but ServiceNow shows ${req.story_number} in "${fresh.state_label}" (expected "${req.new_state}").`;
+      await finishRun(run.id, ui.run, { ok: false, error });
+      return { runId: run.id, ok: false, summary: error };
+    }
+    summary = sync.ok ? `${req.story_number} moved to ${req.new_state} (verified)${req.work_note ? ' + work note added' : ''}` : `${summary} (couldn't verify: ${sync.summary})`;
+  }
+  await finishRun(run.id, { ...ui.run, result: summary }, { ok: true });
   publish('board', { syncedAt: new Date().toISOString() });
   return { runId: run.id, ok: true, summary };
 }

@@ -5,7 +5,8 @@ description: How ARCO's ServiceNow VTB and timesheets map to tables, fields and 
 # ServiceNow at ARCO
 
 Instance: `https://arcoconstruction.service-now.com`. Agents never call ServiceNow directly. The app reads and
-writes through Matt's browser session, using vetted scripts in `server/src/servicenow/snippets.ts`.
+writes through Matt's browser session. Reads use vetted read-only scripts in `server/src/servicenow/snippets.ts`.
+Approved writes are made through the ServiceNow UI, like a person would make them, and then checked with a sync.
 
 ## Board
 - VTB "ABS Data and Analytics: Current Sprint" (`vtb_board` 423702ce837b0350cc2a47447daad34e), a guided board

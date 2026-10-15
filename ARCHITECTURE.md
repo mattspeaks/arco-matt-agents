@@ -130,7 +130,8 @@ the UI, and only then does the app act:
 | Kind | Created by | On approve |
 |---|---|---|
 | `start_worker` | `start_worker` for a write-capable worker | Worker run starts |
-| `sn_write` | `propose_servicenow_update` | Vetted PATCH runs in the browser session (state and/or work note) |
+| `sn_write` | `propose_servicenow_update` | A browser session sets State and/or adds the work note on the story form, then a sync verifies the result |
+| `timesheet_write` | `propose_timesheet_entry` | A browser session types the hours into the Time Sheet Portal, then a sync verifies the result |
 | `lesson` | `propose_lesson` | Appended to `memory/<worker>-lessons.md` |
 
 ### 3.4 Skills and lessons
@@ -145,14 +146,23 @@ installed.
 
 ### 4.1 Access method
 
-Access goes through **Claude in Chrome on Matt's browser session**, with no integration user or OAuth app. A
-headless Claude session (`claude -p --chrome`) opens the instance in Matt's Chrome and runs **one vetted
-JavaScript snippet** (`server/src/servicenow/snippets.ts`). The snippet calls the **REST Table API from inside
-the page**, using the session token (`X-UserToken: g_ck`). The results are JSON, not screen-scraped HTML, so a UI
-change doesn't break the integration.
+Access goes through **Claude in Chrome on Matt's browser session**, with no integration user or OAuth app.
 
-- Agents never write their own ServiceNow requests. Reads are fixed GETs, and writes are a single PATCH of
-  `state` and `work_notes` on `rm_story`, built only from an approved request.
+**Reads:** a headless Claude session (`claude -p --chrome`) opens the instance in Matt's Chrome and runs **one
+vetted, read-only JavaScript snippet** (`server/src/servicenow/snippets.ts`). The snippet calls the **REST Table
+API from inside the page**, using the session token (`X-UserToken: g_ck`). The results are JSON, not
+screen-scraped HTML, so a UI change doesn't break the sync.
+
+**Writes go through the UI, the way Matt would make them by hand** (`runChromeUiTask` in `chrome.ts`). A script
+that sends write requests with the page's session token looks like cross-site scripting, and Claude Code's auto
+mode classifier blocks it. So after Matt approves a change, a headless session with **no `javascript_tool`**
+follows click-by-click steps the app generates: for a timesheet entry, in the Time Sheet Portal; for a story
+update, on the story form. The app then **runs a sync and checks** that the value really changed, instead of
+trusting the session's reply. Every browser job closes its tab when it finishes. This stays in place until there's
+an integration account or API access for writes.
+
+- Agents never write their own ServiceNow requests. Reads are fixed GETs. Writes are generated, step-by-step UI
+  instructions for one approved change.
 - The payload is read straight from the tool result in the stream, so the model never re-types data.
 - **Extension constraints we work around:** results are capped at 50 KB (we chunk them), each string is capped at
   1000 chars (we split chunks into pieces), and text that looks like cookies or query strings is blanked (we
@@ -214,8 +224,9 @@ shows it and puts each story's hours next to its card, and the orchestrator can 
 
 The orchestrator writes time with `propose_timesheet_entry`, which creates a `timesheet_write` approval card. Each
 entry sets one day's total for one row: a story or task, or a category such as Admin or Meeting. Because it sets a
-value rather than adding one, retrying can't log the same hours twice. When Matt approves, `timeEntrySnippet`
-updates the matching `time_card` or creates one, and the local copy is updated to match. Guardrails:
+value rather than adding one, retrying can't log the same hours twice. When Matt approves, a browser session
+types the hours into the Time Sheet Portal, adding the task's row from the Tasks panel if needed. A sync then
+confirms the new value. Guardrails:
 - Matt's own timesheet only, and only for the current or previous week.
 - Pending sheets and cards only.
 - Hours go in quarter-hour steps, with no more than 24h in a day.

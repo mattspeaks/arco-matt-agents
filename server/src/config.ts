@@ -23,6 +23,7 @@ export interface AppConfig {
     instanceUrl: string;
     boardSysId: string;
     storyTable: string;
+    timesheetPortalUrl: string;
     routingTags: Record<string, string[]>;
     lanes: { ready: string; agentInProgress: string; agentReview: string };
     agentAllowedTargetStates: string[];

@@ -61,6 +61,19 @@ export function cancelClaudeRun(runId: string): boolean {
   return true;
 }
 
+/**
+ * The server's environment minus anything that would make the child behave like a nested session of whatever
+ * Claude Code session started `npm run dev`, or override the claude.ai login (an API key also disables Chrome).
+ */
+function childEnv(): NodeJS.ProcessEnv {
+  const keep = new Set(['CLAUDE_CODE_GIT_BASH_PATH']);
+  const env: NodeJS.ProcessEnv = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (keep.has(k) || !/^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_PID$|CLAUDE_EFFORT$|ANTHROPIC_API_KEY$)/.test(k)) env[k] = v;
+  }
+  return env;
+}
+
 export function runClaude(o: ClaudeRunOptions): Promise<ClaudeRunResult> {
   mkdirSync(TMP_DIR, { recursive: true });
   const tmpFiles: string[] = [];
@@ -92,7 +105,7 @@ export function runClaude(o: ClaudeRunOptions): Promise<ClaudeRunResult> {
 
     const child = spawn(CLAUDE_BIN, args, {
       cwd: o.cwd,
-      env: { ...process.env, ...o.env },
+      env: { ...childEnv(), ...o.env },
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
@@ -110,7 +123,12 @@ export function runClaude(o: ClaudeRunOptions): Promise<ClaudeRunResult> {
         sessionId = msg.session_id;
         void updateRun(o.runId, { session_id: sessionId });
         const servers = (msg.mcp_servers ?? []).map((s: StreamMessage) => `${s.name}:${s.status}`);
-        void addEvent(o.runId, 'init', `Session started · ${msg.model}`, { model: msg.model, mcp: servers, cwd: msg.cwd });
+        void addEvent(o.runId, 'init', `Session started · ${msg.model} · ${msg.permissionMode ?? '?'} permissions`, {
+          model: msg.model,
+          mcp: servers,
+          cwd: msg.cwd,
+          permissionMode: msg.permissionMode,
+        });
       } else if (msg.type === 'assistant') {
         for (const block of msg.message?.content ?? []) {
           if (block.type === 'text' && block.text?.trim()) {

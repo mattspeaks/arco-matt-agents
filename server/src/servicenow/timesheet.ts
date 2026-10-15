@@ -1,10 +1,10 @@
-import { publish } from '../bus.js';
+import { config } from '../config.js';
 import { finishRun } from '../claude/runner.js';
-import { query, queryOne } from '../db/index.js';
-import { createRun } from '../runs.js';
-import { runChromeScript } from './chrome.js';
-import { TIMESHEET_MARKER, WEEKDAYS, timeEntrySnippet, type Weekday } from './snippets.js';
-import type { SyncOutcome } from './sync.js';
+import { queryOne } from '../db/index.js';
+import { addEvent, createRun } from '../runs.js';
+import { runChromeUiTask } from './chrome.js';
+import { WEEKDAYS, type Weekday } from './snippets.js';
+import { startSync, type SyncOutcome } from './sync.js';
 
 export interface TimeEntryRequest {
   task_number?: string;
@@ -79,53 +79,81 @@ export function describeTimeEntry(e: ResolvedTimeEntry): string {
   return `Timesheet: ${what}, ${dayLabel} ${e.date}: ${e.current_hours ?? '?'}h → ${e.hours}h`;
 }
 
-interface TimeEntryResult {
-  status: number;
-  action: 'updated' | 'created' | null;
-  error: string | null;
-  previous?: number;
-  sys_id?: string;
-  category?: string;
-  day_hours?: number;
-  total?: number;
-  state?: string;
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const parseYmd = (s: string) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+
+/** The portal's own labels: week "October 11 - October 17, 2026", day column "Wed 14". */
+function portalLabels(e: ResolvedTimeEntry) {
+  const start = parseYmd(e.week_starts_on);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const week = `${MONTHS[start.getMonth()]} ${start.getDate()} - ${MONTHS[end.getMonth()]} ${end.getDate()}, ${end.getFullYear()}`;
+  const day = `${e.day[0].toUpperCase()}${e.day.slice(1, 3)} ${parseYmd(e.date).getDate()}`;
+  return { week, day };
 }
 
-/** Executes an approved time entry in the browser session, then mirrors it into the local copy. */
+async function rowTitle(e: ResolvedTimeEntry): Promise<string | null> {
+  if (!e.task_number) return null;
+  const row = await queryOne<{ t: string }>(
+    `SELECT TOP 1 COALESCE(c.task_short_description, s.short_description) AS t
+     FROM (SELECT ? AS n) x LEFT JOIN dbo.time_cards c ON c.task_number = x.n LEFT JOIN dbo.stories s ON s.number = x.n`,
+    [e.task_number],
+  );
+  return row?.t ?? null;
+}
+
+/** The click-by-click instructions for the Time Sheet Portal (/tcp), from a read-only look at its layout. */
+async function timesheetSteps(e: ResolvedTimeEntry): Promise<string> {
+  const { week, day } = portalLabels(e);
+  const title = await rowTitle(e);
+  const row = e.task_number
+    ? `the row whose task link is ${e.task_number}${title ? ` (title "${title}")` : ''}${e.category ? ` and category ${e.category}` : ''}. Titles repeat, so match on the task number`
+    : `the "${e.category}" row (a category row with no task link)`;
+  const addRow = e.task_number
+    ? `If there is no such row, add it: in the left "Tasks" panel, type ${e.task_number} in the Search box (check the "All Tasks" filter and the Group Tasks / Other tabs if it doesn't show), then click that card's "Add … to time sheet" button. If you can't find it, reply FAILED rather than adding a different task.`
+    : `If there is no such row, reply FAILED.`;
+  return `2. Check the week selector shows "${week}". If not, use "Go to previous time sheet" / "Go to next time sheet" until it does. The status pill must read Pending; if not, reply FAILED.
+3. In "Logged Time Cards", find ${row}. ${addRow}
+4. Set that row's "${day}" cell to ${e.hours}. Clicking the cell should make it editable or open a small editor: select the existing value, type ${e.hours}, then press Enter or Tab (or click the editor's Save/OK button if it has one). Don't touch other cells or rows.
+5. Confirm the change took: the cell shows ${e.hours} and the "${day}" day tile / row total updated. Wait a moment for it to save. Never click Submit.`;
+}
+
+/** Makes an approved time entry through the Time Sheet Portal UI, then verifies it with a read-only sync. */
 export async function applyTimeEntry(entry: ResolvedTimeEntry, approvalId: string): Promise<SyncOutcome> {
   const label = describeTimeEntry(entry);
   const run = await createRun({ kind: 'sn_write', title: label, storyNumber: entry.task_number, meta: { approvalId, ...entry } });
-  const code = timeEntrySnippet({ weekStartsOn: entry.week_starts_on, day: entry.day, hours: entry.hours, taskNumber: entry.task_number, category: entry.category });
-  const { run: res, payload } = await runChromeScript<TimeEntryResult>(run.id, TIMESHEET_MARKER, code, 'approved timesheet entry');
-  if (!payload || payload.error || payload.status >= 300) {
-    const error = payload?.error ?? res.error ?? 'Timesheet write result not found in the browser session output.';
-    await finishRun(run.id, res, { ok: false, error });
+  const what = entry.task_number ? `${entry.task_number}${entry.category ? ` (${entry.category})` : ''}` : `the ${entry.category} row`;
+  const ui = await runChromeUiTask(run.id, {
+    change: `On Matt's own timesheet, set the hours for ${what} on ${entry.day} ${entry.date} to ${entry.hours} (week of ${entry.week_starts_on}). Do not submit the timesheet.`,
+    approvalId,
+    landingUrl: config.servicenow.timesheetPortalUrl,
+    steps: await timesheetSteps(entry),
+  });
+  if (ui.status !== 'DONE') {
+    const error = ui.status === 'LOGIN_REQUIRED' ? 'ServiceNow login required: log in in Chrome, then approve again.' : ui.detail;
+    await finishRun(run.id, ui.run, { ok: false, error });
     return { runId: run.id, ok: false, summary: error };
   }
-  await mirrorLocally(entry, payload);
-  const summary = `Timesheet ${payload.action}: ${entry.task_number ?? entry.category} ${entry.day} ${entry.date} = ${payload.day_hours}h (was ${payload.previous ?? 0}h; row total ${payload.total}h)`;
-  await finishRun(run.id, { ...res, result: summary }, { ok: true });
-  publish('board', { syncedAt: new Date().toISOString() });
-  return { runId: run.id, ok: true, summary };
-}
 
-async function mirrorLocally(entry: ResolvedTimeEntry, r: TimeEntryResult) {
-  const sheet = await queryOne<{ sys_id: string }>('SELECT sys_id FROM dbo.timesheets WHERE week_starts_on = ?', [entry.week_starts_on]);
-  if (!sheet || !r.sys_id) return;
-  const day = entry.day; // whitelisted weekday name, safe as a column name
-  const exists = await queryOne('SELECT 1 AS x FROM dbo.time_cards WHERE sys_id = ?', [r.sys_id]);
-  if (exists) {
-    await query(`UPDATE dbo.time_cards SET ${day} = ?, total = ?, synced_at = SYSUTCDATETIME() WHERE sys_id = ?`, [r.day_hours ?? entry.hours, r.total ?? null, r.sys_id]);
-  } else {
-    await query(
-      `INSERT INTO dbo.time_cards (sys_id, time_sheet_id, task_number, category, sunday, monday, tuesday, wednesday, thursday, friday, saturday, total, state)
-       VALUES (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, ?, ?)`,
-      [r.sys_id, sheet.sys_id, entry.task_number ?? null, r.category ?? entry.category ?? null, r.total ?? entry.hours, r.state ?? 'Pending'],
-    );
-    await query(`UPDATE dbo.time_cards SET ${day} = ? WHERE sys_id = ?`, [r.day_hours ?? entry.hours, r.sys_id]);
+  // Don't trust the reply: re-read the timesheet and check the value really landed.
+  await addEvent(run.id, 'text', `Browser session reports: ${ui.detail}. Verifying with a sync…`);
+  const sync = await (await startSync(run.id)).done;
+  const fresh = await resolveTimeEntry({ task_number: entry.task_number, category: entry.category, day: entry.date, hours: entry.hours });
+  const actual = typeof fresh === 'string' ? null : fresh.current_hours;
+  if (!sync.ok || actual === null) {
+    const summary = `Entered in the portal (${ui.detail}), but couldn't verify: ${sync.ok ? 'that week is not in the synced copy' : sync.summary}. Check the portal.`;
+    await finishRun(run.id, { ...ui.run, result: summary }, { ok: true, error: 'unverified' });
+    return { runId: run.id, ok: true, summary };
   }
-  await query(
-    'UPDATE dbo.timesheets SET total_hours = (SELECT COALESCE(SUM(total), 0) FROM dbo.time_cards WHERE time_sheet_id = ?) WHERE sys_id = ?',
-    [sheet.sys_id, sheet.sys_id],
-  );
+  if (actual !== entry.hours) {
+    const error = `The browser session reported success, but ServiceNow shows ${actual}h (expected ${entry.hours}h). Check the portal.`;
+    await finishRun(run.id, ui.run, { ok: false, error });
+    return { runId: run.id, ok: false, summary: error };
+  }
+  const summary = `Timesheet updated and verified: ${what} ${entry.day} ${entry.date} = ${actual}h`;
+  await finishRun(run.id, { ...ui.run, result: summary }, { ok: true });
+  return { runId: run.id, ok: true, summary };
 }

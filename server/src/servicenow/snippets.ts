@@ -10,8 +10,6 @@
 // And it truncates any single string value at 1000 chars, so each chunk is an array of short pieces.
 
 export const SYNC_MARKER = 'arco-sync-v1';
-export const WRITE_MARKER = 'arco-write-v1';
-export const TIMESHEET_MARKER = 'arco-timesheet-v1';
 export const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 export type Weekday = (typeof WEEKDAYS)[number];
 export const CHUNK_SIZE = 18000;
@@ -105,87 +103,3 @@ if (sheet) {
 })`);
 }
 
-/** PATCH a story's state and/or add a work note. Only ever built from an approved request. */
-export function storyWriteSnippet(p: { storyTable: string; sysId: string; body: { state?: string; work_notes?: string } }): string {
-  if (!/^[0-9a-f]{32}$/.test(p.sysId)) throw new Error(`Invalid sys_id: ${p.sysId}`);
-  return chunked(
-    WRITE_MARKER,
-    `${PRELUDE}
-const r = await fetch('/api/now/table/' + ${JSON.stringify(p.storyTable)} + '/' + ${JSON.stringify(p.sysId)} +
-  '?sysparm_fields=number,state,sys_updated_on&sysparm_display_value=all', {
-  method: 'PATCH', headers: H, credentials: 'same-origin', body: JSON.stringify(${JSON.stringify(p.body)}),
-});
-const body = await r.json().catch(() => null);`,
-    `({ __arco: ${JSON.stringify(WRITE_MARKER)}, status: r.status,
-   number: vv(body?.result?.number), state_value: vv(body?.result?.state), state_label: dv(body?.result?.state),
-   error: r.ok ? null : JSON.stringify(body?.error ?? body).slice(0, 500) })`,
-  );
-}
-
-export interface TimeEntryWrite {
-  weekStartsOn: string; // YYYY-MM-DD (Sunday)
-  day: Weekday;
-  hours: number; // the day's new total for this row (a set, not an add, so a retry can't double-log)
-  taskNumber?: string; // e.g. STRY0024063; omit for non-task rows like Admin or Meeting
-  category?: string; // display label, e.g. "Task work", "Admin", "Meeting"
-}
-
-/** Set one day's hours on Matt's own time card: update the matching row or create it. Only built from an approved request. */
-export function timeEntrySnippet(p: TimeEntryWrite): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.weekStartsOn)) throw new Error(`Invalid week: ${p.weekStartsOn}`);
-  if (!WEEKDAYS.includes(p.day)) throw new Error(`Invalid day: ${p.day}`);
-  if (p.taskNumber && !/^[A-Z]+\d+$/.test(p.taskNumber)) throw new Error(`Invalid task number: ${p.taskNumber}`);
-  if (!p.taskNumber && !p.category) throw new Error('A task number or a category is required');
-  return chunked(
-    TIMESHEET_MARKER,
-    `${PRELUDE}
-const WEEK = ${JSON.stringify(p.weekStartsOn)}, DAY = ${JSON.stringify(p.day)}, HOURS = ${JSON.stringify(p.hours)};
-const TASK = ${JSON.stringify(p.taskNumber ?? null)}, CATEGORY = ${JSON.stringify(p.category ?? null)};
-const send = async (method, path, body) => {
-  const r = await fetch(path, { method, headers: H, credentials: 'same-origin', body: JSON.stringify(body) });
-  const j = await r.json().catch(() => null);
-  return { status: r.status, ok: r.ok, result: j?.result, error: r.ok ? null : JSON.stringify(j?.error ?? j).slice(0, 500) };
-};
-let out = { status: 0, action: null, error: null };
-const fields = 'sys_id,task,category,state,total,' + DAY;
-const sheets = await get('/api/now/table/time_sheet?sysparm_query=' + q('user=javascript:gs.getUserID()^week_starts_on=' + WEEK) +
-  '&sysparm_fields=sys_id,user,state&sysparm_display_value=all&sysparm_limit=1');
-const sheet = sheets.result?.[0];
-if (sheets.error || !sheet) out.error = sheets.error ? 'time_sheet lookup failed: ' + sheets.error : 'No timesheet for the week of ' + WEEK + '. Open the time card portal once to create it.';
-else if (dv(sheet.state) !== 'Pending') out.error = 'Timesheet for ' + WEEK + ' is ' + dv(sheet.state) + ', not Pending; it can no longer be edited here.';
-let taskId = null;
-if (!out.error && TASK) {
-  const tk = await get('/api/now/table/task?sysparm_query=' + q('number=' + TASK) + '&sysparm_fields=sys_id,number&sysparm_limit=1');
-  taskId = tk.result?.[0]?.sys_id ?? null;
-  if (!taskId) out.error = 'Task ' + TASK + ' not found.';
-}
-if (!out.error) {
-  const tc = await get('/api/now/table/time_card?sysparm_query=' + q('time_sheet=' + vv(sheet.sys_id)) +
-    '&sysparm_fields=' + fields + '&sysparm_display_value=all&sysparm_exclude_reference_link=true&sysparm_limit=200');
-  const cards = tc.result || [];
-  const sameCat = (c) => !CATEGORY || dv(c.category) === CATEGORY;
-  const match = TASK
-    ? cards.find((c) => vv(c.task) === taskId && sameCat(c)) || (!CATEGORY && cards.find((c) => vv(c.task) === taskId))
-    : cards.find((c) => !vv(c.task) && dv(c.category) === CATEGORY);
-  let res;
-  if (match) {
-    if (dv(match.state) !== 'Pending') out.error = 'That time card is ' + dv(match.state) + ', not Pending.';
-    else { out.action = 'updated'; out.previous = +vv(match[DAY]) || 0; res = await send('PATCH', '/api/now/table/time_card/' + vv(match.sys_id) + '?sysparm_fields=' + fields + '&sysparm_display_value=all', { [DAY]: String(HOURS) }); }
-  } else {
-    const label = CATEGORY || 'Task work';
-    const catValue = vv(cards.find((c) => dv(c.category) === label)?.category) || label.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    const body = { time_sheet: vv(sheet.sys_id), user: vv(sheet.user), week_starts_on: WEEK, category: catValue, [DAY]: String(HOURS) };
-    if (taskId) body.task = taskId;
-    out.action = 'created'; out.previous = 0;
-    res = await send('POST', '/api/now/table/time_card?sysparm_fields=' + fields + '&sysparm_display_value=all', body);
-  }
-  if (res) {
-    out.status = res.status;
-    if (!res.ok) out.error = res.error;
-    else Object.assign(out, { sys_id: vv(res.result.sys_id), category: dv(res.result.category), day_hours: +vv(res.result[DAY]) || 0,
-      total: +vv(res.result.total) || 0, state: dv(res.result.state) });
-  }
-}`,
-    `({ __arco: ${JSON.stringify(TIMESHEET_MARKER)}, ...out })`,
-  );
-}

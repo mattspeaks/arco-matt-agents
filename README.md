@@ -42,4 +42,5 @@ Open http://127.0.0.1:5173, click **Sync ServiceNow**, then talk to the orchestr
 | Worker prompts | `.claude/agents/*.md` |
 | Standards the workers follow | `.claude/skills/*` |
 | Approved lessons | `memory/*-lessons.md` |
-| ServiceNow scripts (the only code that touches ServiceNow) | `server/src/servicenow/snippets.ts` |
+| ServiceNow reads (vetted read-only scripts) | `server/src/servicenow/snippets.ts` |
+| ServiceNow writes (step-by-step UI instructions) | `server/src/servicenow/timesheet.ts`, `sync.ts` (`applyStoryUpdate`), `chrome.ts` (`runChromeUiTask`) |
