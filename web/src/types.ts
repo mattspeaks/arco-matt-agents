@@ -83,10 +83,10 @@ export interface RunEvent {
 
 export interface Approval {
   id: string;
-  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'lesson';
+  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson';
   title: string;
   payload: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'superseded';
   outcome: string | null;
   decision_note: string | null;
   created_at: string;
@@ -104,7 +104,7 @@ export interface Conversation {
 export interface ChatMessage {
   id: number;
   conversation_id: string;
-  role: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant' | 'error' | 'approval'; // approval: content is an approval id, shown as a card
   content: string;
   run_id: string | null;
   created_at: string;

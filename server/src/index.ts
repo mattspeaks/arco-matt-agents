@@ -6,7 +6,7 @@ import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
 import { decide, listApprovals, createApproval } from './approvals.js';
 import { proposeLesson } from './lessons.js';
-import { createConversation, getMessages, listConversations, requestRefresh, sendMessage } from './orchestrator.js';
+import { createConversation, getMessages, listConversations, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getStory, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
@@ -129,6 +129,28 @@ app.post<{ Body: AgentBody }>('/api/agent/get_run', async (req) => runSummary(aw
 app.post<{ Body: AgentBody }>('/api/agent/wait_for_run', async (req) => {
   const timeout = Math.min(Number(req.body.timeout_seconds ?? 600), 840) * 1000;
   return runSummary(await waitForRun(String(req.body.run_id), timeout));
+});
+
+// The servicenow skill's preview step: an Approve / Reject card inside the chat. Deciding it posts Matt's answer
+// into the chat as his message; the orchestrator then writes (or doesn't) in its next turn.
+app.post<{ Body: AgentBody }>('/api/agent/request_approval', async (req) => {
+  const title = str(req.body.title);
+  const preview = str(req.body.preview);
+  if (!title || !preview) throw bad('title and preview are required');
+  const run = req.body.parentRunId ? await getRun(req.body.parentRunId) : undefined;
+  if (!run?.conversation_id) throw bad('request_approval only works inside a chat conversation');
+  const approval = await createApproval({
+    kind: 'sn_confirm',
+    title,
+    payload: { conversationId: run.conversation_id, title, preview },
+    requestedByRunId: run.id,
+  });
+  await postApprovalCard(run.conversation_id, approval.id);
+  return {
+    approval_id: approval.id,
+    status: 'pending',
+    note: 'The card is in the chat. End your turn now. Matt\'s answer arrives as his next message ("Yes, go ahead: …" or "No, …"). Write only after a yes.',
+  };
 });
 
 app.post<{ Body: AgentBody }>('/api/agent/propose_lesson', async (req) => {

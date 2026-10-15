@@ -63,8 +63,14 @@ window.SN = async (path, opts = {}) => {
   in-page to what you need before returning them: the extension caps results at about 50KB and string values at
   1000 characters.
 - **Write the HTTP method literally** (`method: 'PATCH'`) so the change is obvious to anyone reading it.
-- **Writes = resolve → preview → Matt's "yes" → re-check → write → verify.** See `references/writing.md`. Use one
-  "yes" per previewed batch. If anything changes after the preview, preview it again.
+- **Writes = resolve → preview → Matt's "yes" → re-check → write → verify → resync.** See `references/writing.md`.
+  For the preview, call **`mcp__arco__request_approval`** (title + markdown preview) so Matt gets an Approve / Reject
+  card in the chat, then **end your turn**. His answer comes back as his next message ("Yes, go ahead: …" or
+  "No, …"); a typed "yes" counts too. Use one "yes" per previewed batch. If anything changes after the preview,
+  preview it again.
+- **Always finish a write by re-running the matching snapshot** from `references/reading.md`: the board after a
+  story change, the timesheet after an hours change. That's how the app's local copy updates. The app won't let the
+  turn end without it.
 - Never delete records. Never write to tables other than `rm_story` and `time_card`.
 - If API calls start failing with 401/403, tell Matt. Don't switch to clicking through the UI unless he asks.
 - When you're done with ServiceNow for this reply, **close the tabs you opened** with `tabs_close_mcp`.

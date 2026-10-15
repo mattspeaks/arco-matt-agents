@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { supersedeChatApprovals } from './approvals.js';
 import { publish } from './bus.js';
 import { API_BASE, config, REPO_ROOT } from './config.js';
 import { finishRun, isRunActive, runClaude, type StreamMessage } from './claude/runner.js';
@@ -18,7 +19,9 @@ export interface Conversation {
 }
 
 const MCP_SCRIPT = resolve(REPO_ROOT, 'server/mcp/arco-mcp.mjs');
+const NODE = process.execPath.replace(/\\/g, '/');
 const WRITE_GUARD = resolve(REPO_ROOT, 'server/hooks/sn-write-guard.mjs').replace(/\\/g, '/');
+const RESYNC_CHECK = resolve(REPO_ROOT, 'server/hooks/sn-resync-check.mjs').replace(/\\/g, '/');
 const REFRESH_TITLE = 'ServiceNow refresh';
 
 // Chrome tools for the servicenow skill. No form_input/uploads: writes go through previewed, guarded API calls.
@@ -30,9 +33,11 @@ const SESSION_SETTINGS = {
     PreToolUse: [
       {
         matcher: 'mcp__claude-in-chrome__javascript_tool',
-        hooks: [{ type: 'command', command: `"${process.execPath.replace(/\\/g, '/')}" "${WRITE_GUARD}"` }],
+        hooks: [{ type: 'command', command: `"${NODE}" "${WRITE_GUARD}"` }],
       },
     ],
+    // A turn that changed ServiceNow can't finish until it has re-read the board/timesheet for the app's copy.
+    Stop: [{ hooks: [{ type: 'command', command: `"${NODE}" "${RESYNC_CHECK}"` }] }],
   },
 };
 const busy = new Map<string, string>(); // conversationId -> runId
@@ -61,7 +66,12 @@ export async function getMessages(conversationId: string) {
   ]);
 }
 
-async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error', content: string, runId?: string) {
+/** An approval card inside the chat (content = approval id). No run id, so it doesn't end the "working" state. */
+export async function postApprovalCard(conversationId: string, approvalId: string) {
+  await addMessage(conversationId, 'approval', approvalId);
+}
+
+async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error' | 'approval', content: string, runId?: string) {
   const [row] = await query(
     `INSERT INTO dbo.chat_messages (conversation_id, role, content, run_id)
      OUTPUT inserted.id, inserted.conversation_id, inserted.role, inserted.content, inserted.run_id, inserted.created_at
@@ -119,7 +129,11 @@ export async function requestRefresh(): Promise<{ runId: string; conversationId:
 }
 
 /** One orchestrator turn: a headless Claude session resumed per conversation, with the arco MCP tools and Chrome. */
-export async function sendMessage(conversationId: string, text: string, opts: { kind?: RunKind } = {}): Promise<{ runId: string }> {
+export async function sendMessage(
+  conversationId: string,
+  text: string,
+  opts: { kind?: RunKind; answersApprovalId?: string } = {},
+): Promise<{ runId: string }> {
   const conv = await getConversation(conversationId);
   if (!conv) throw Object.assign(new Error('Conversation not found'), { statusCode: 404 });
   const running = busy.get(conversationId);
@@ -130,6 +144,7 @@ export async function sendMessage(conversationId: string, text: string, opts: { 
     publish('conversation', await getConversation(conversationId));
   }
 
+  await supersedeChatApprovals(conversationId, opts.answersApprovalId);
   const run = await createRun({ kind: opts.kind ?? 'orchestrator', title: text.slice(0, 120), conversationId, prompt: text });
   busy.set(conversationId, run.id);
   await addMessage(conversationId, 'user', text, run.id);

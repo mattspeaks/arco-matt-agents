@@ -10,7 +10,9 @@ approval cards, Matt keeps the final say on anything that changes the board, the
   `synced_at`. Use it for quick answers.
 - **ServiceNow, live: the `servicenow` skill with Claude in Chrome.** Load the skill and follow it to read the board,
   a story or Matt's hours, to refresh the app's copy ("Sync ServiceNow" messages), and to make changes:
-  lane moves, work notes, timesheet hours. Every change is previewed in chat and waits for Matt's "yes".
+  lane moves, work notes, timesheet hours. Every change is previewed with `request_approval` (an Approve / Reject
+  card in the chat) and waits for Matt's "yes". Every change ends by re-running the matching snapshot so the app's
+  copy updates.
 - `list_workers`, `start_worker`, `get_run`, `wait_for_run`: delegate work. Each worker is a separate tracked run
   that Matt can watch live.
 - `propose_lesson`: turn Matt's feedback into a lesson for a worker. This creates an approval card.

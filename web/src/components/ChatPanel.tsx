@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, fmtTime } from '../api';
 import { useRunEvents } from '../runEvents';
-import type { ChatMessage, Conversation } from '../types';
+import type { Approval, ChatMessage, Conversation } from '../types';
+import { ApprovalCard } from './ActivityPanel';
 
 const ACTIVE_KEY = 'arco.activeConversation';
 
@@ -17,12 +18,14 @@ function loadActive(): string | null {
 
 export function ChatPanel({
   conversations,
+  approvals,
   draft,
   onDraftConsumed,
   onOpenRun,
   onError,
 }: {
   conversations: Conversation[];
+  approvals: Approval[];
   draft: string | null;
   onDraftConsumed: () => void;
   onOpenRun: (id: string) => void;
@@ -65,7 +68,9 @@ export function ChatPanel({
       const m = (e as CustomEvent<ChatMessage>).detail;
       if (m.conversation_id !== activeId) return;
       setMessages((ms) => (ms.some((x) => x.id === m.id) ? ms : [...ms, m]));
-      if (m.role !== 'user') setPendingRunId((id) => (id === m.run_id ? null : id));
+      // A reply can also come from an Approve/Reject click, so follow any new user turn.
+      if (m.role === 'user' && m.run_id) setPendingRunId(m.run_id);
+      else if (m.role !== 'user' && m.run_id) setPendingRunId((id) => (id === m.run_id ? null : id));
     };
     window.addEventListener('arco:chat', onChat);
     return () => window.removeEventListener('arco:chat', onChat);
@@ -130,7 +135,16 @@ export function ChatPanel({
             <div className="muted small">Try: "Check the board for #PowerBI stories and propose a plan" or "QC the Safety Scorecards project".</div>
           </div>
         )}
-        {messages.map((m) => (
+        {messages.map((m) => {
+          if (m.role === 'approval') {
+            const approval = approvals.find((a) => a.id === m.content);
+            return (
+              <div key={m.id} className="msg approval-msg">
+                {approval ? <ApprovalCard approval={approval} onError={onError} /> : <p className="muted small">Approval card not found.</p>}
+              </div>
+            );
+          }
+          return (
           <div key={m.id} className={`msg ${m.role}`}>
             <div className="msg-meta small muted">
               {m.role === 'user' ? 'You' : m.role === 'assistant' ? 'Orchestrator' : 'Error'} · {fmtTime(m.created_at)}
@@ -144,7 +158,8 @@ export function ChatPanel({
               {m.role === 'user' ? <p className="prewrap">{m.content}</p> : <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>}
             </div>
           </div>
-        ))}
+          );
+        })}
         {pendingRunId && (
           <div className="msg assistant working">
             <div className="msg-meta small muted">

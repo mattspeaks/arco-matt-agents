@@ -244,6 +244,12 @@ pre, code, .mono { font-family: var(--mono); }
 .approval-title { font-weight: 600; margin: 2px 0 6px; }
 .approval .input { margin: 6px 0; background: var(--panel); }
 .approval-actions { display: flex; gap: 8px; }
+.approval-preview { background: var(--panel); border-radius: var(--radius); padding: 4px 8px; margin: 4px 0 2px; }
+.approval-decided { font-weight: 600; color: var(--muted); }
+.approval-decided.approved { color: var(--ok, var(--muted)); }
+.msg.approval-msg { max-width: 100%; width: 100%; }
+.msg.approval-msg .approval { margin: 0; }
+.msg.approval-msg .approval:not(:has(.approval-actions)) { border-color: var(--border, var(--muted)); background: transparent; }
 .kv { display: grid; grid-template-columns: 72px 1fr; gap: 3px 8px; margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; min-width: 0; }

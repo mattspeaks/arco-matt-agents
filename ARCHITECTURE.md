@@ -124,8 +124,9 @@ needs approval) is in `config/app.config.json` and is enforced by the runner thr
 
 ### 3.3 Approvals
 
-Approvals are the human checkpoint. ServiceNow changes are approved **in chat**: the orchestrator previews them, and
-Matt replies "yes" (§4.1). The orchestrator can only *propose* the following; Matt approves or rejects them in the UI,
+Approvals are the human checkpoint. ServiceNow changes are approved **in chat**: the orchestrator calls
+`request_approval`, which puts an Approve / Reject card (`sn_confirm`) inside the conversation. Clicking it posts Matt's
+answer ("Yes, go ahead: …" or "No, …") into the chat as his message, and typing "yes" works too (§4.1). The orchestrator can only *propose* the following; Matt approves or rejects them in the UI,
 and only then does the app act:
 
 | Kind | Created by | On approve |
@@ -155,8 +156,10 @@ does the work itself.**
 - **How:** the `servicenow` skill (`.claude/skills/servicenow/`) defines a small `window.SN` fetch helper in a
   ServiceNow tab. Each step is then one short, readable REST Table API call, authenticated by the page's session
   token (`g_ck`).
-- **Writes:** resolve → preview in chat → **Matt's explicit "yes"** → re-check `sys_updated_on` → PATCH/POST →
-  verify the returned record → refresh the snapshot.
+- **Writes:** resolve → preview card in chat → **Matt's explicit "yes"** → re-check `sys_updated_on` → PATCH/POST →
+  verify the returned record → **resync**. The `server/hooks/sn-resync-check.mjs` Stop hook won't let a turn that
+  changed ServiceNow end until it has re-read the matching snapshot (board for stories, timesheet for hours), so the
+  app's local copy always reflects the change.
 - **Guard:** `server/hooks/sn-write-guard.mjs` is a PreToolUse hook on `javascript_tool`. It blocks DELETE/PUT,
   writes to tables other than `rm_story`/`time_card`, story states outside `agentAllowedStateValues`, and any change
   to `time_sheet` or a time card's `state`, whatever the model writes.

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { api, fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
 
@@ -88,7 +90,9 @@ function RunRow({ run, onOpen }: { run: Run; onOpen: (id: string) => void }) {
   );
 }
 
-function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
+const DECIDED_LABEL: Record<Approval['status'], string> = { pending: '', approved: 'Approved', rejected: 'Rejected', superseded: 'Answered in chat' };
+
+export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const p = parseJson<Record<string, string | undefined>>(approval.payload, {});
@@ -106,7 +110,7 @@ function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: 
   return (
     <div className={`approval ${approval.kind}`}>
       <div className="approval-kind small">
-        {approval.kind === 'sn_write'
+        {approval.kind === 'sn_write' || approval.kind === 'sn_confirm'
           ? 'ServiceNow change'
           : approval.kind === 'timesheet_write'
             ? 'Timesheet entry'
@@ -115,6 +119,11 @@ function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: 
               : 'New lesson'}
       </div>
       <div className="approval-title">{approval.title}</div>
+      {approval.kind === 'sn_confirm' && p.preview && (
+        <div className="approval-preview md small">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
+        </div>
+      )}
       {approval.kind === 'sn_write' && (
         <dl className="kv small">
           <dt>Story</dt>
@@ -175,15 +184,24 @@ function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: 
           )}
         </dl>
       )}
-      <input className="input small" placeholder="Note (optional, sent with your decision)" value={note} onChange={(e) => setNote(e.target.value)} />
-      <div className="approval-actions">
-        <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
-          Approve
-        </button>
-        <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
-          Reject
-        </button>
-      </div>
+      {approval.status === 'pending' ? (
+        <>
+          <input className="input small" placeholder="Note (optional, sent with your decision)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="approval-actions">
+            <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
+              Approve
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
+              Reject
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className={`approval-decided small ${approval.status}`}>
+          {DECIDED_LABEL[approval.status]}
+          {approval.decision_note ? `: ${approval.decision_note}` : ''}
+        </div>
+      )}
     </div>
   );
 }

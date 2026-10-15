@@ -85,6 +85,19 @@ server.registerTool(
 );
 
 server.registerTool(
+  'request_approval',
+  {
+    description:
+      "Show Matt an Approve / Reject card in the chat for a ServiceNow change you've prepared (the preview step of the servicenow skill). After calling it, END YOUR TURN. His answer arrives as his next message. Make the change only after he says yes.",
+    inputSchema: {
+      title: z.string().describe('One line, e.g. "STRY0024070 → Work in progress + work note" or "Timesheet: STRY0024063 Wed 0 → 4h"'),
+      preview: z.string().describe('Markdown: the before → after table and the exact work note text, exactly as it will be written'),
+    },
+  },
+  (args) => call('request_approval', args),
+);
+
+server.registerTool(
   'propose_lesson',
   {
     description: "Draft a lesson from Matt's feedback for a worker's lessons file. Matt approves it in the UI before it's saved.",

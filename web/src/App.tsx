@@ -102,6 +102,7 @@ export function App() {
         <BoardPanel board={board} timesheet={timesheet} onOpenStory={setOpenStory} />
         <ChatPanel
           conversations={conversations}
+          approvals={approvals}
           draft={chatDraft}
           onDraftConsumed={() => setChatDraft(null)}
           onOpenRun={setOpenRunId}

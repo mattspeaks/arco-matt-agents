@@ -5,14 +5,16 @@ import { approveLesson, rejectLesson } from './lessons.js';
 import { updateRun } from './runs.js';
 import { startWorkerRun } from './workers.js';
 
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'lesson';
+// sn_confirm: a ServiceNow change previewed in chat. Deciding it answers in that chat as Matt, so the orchestrator
+// (and anyone reading the conversation) sees his "yes" or "no" right where the change happens.
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson';
 
 export interface Approval {
   id: string;
   kind: ApprovalKind;
   title: string;
   payload: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'superseded';
   outcome: string | null;
   requested_by_run_id: string | null;
   decision_note: string | null;
@@ -50,6 +52,19 @@ export async function listApprovals(status?: string): Promise<Approval[]> {
     : query<Approval>('SELECT TOP 100 * FROM dbo.approvals ORDER BY created_at DESC');
 }
 
+/** Matt typed his own reply instead of clicking: pending in-chat cards for that conversation are answered. */
+export async function supersedeChatApprovals(conversationId: string, exceptId?: string) {
+  const rows = await query<Approval>(
+    `SELECT * FROM dbo.approvals WHERE kind = 'sn_confirm' AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ?`,
+    [conversationId],
+  );
+  for (const a of rows) {
+    if (a.id === exceptId) continue;
+    await query(`UPDATE dbo.approvals SET status = 'superseded', outcome = 'Answered in chat', decided_at = SYSUTCDATETIME() WHERE id = ?`, [a.id]);
+    publish('approval', await getApproval(a.id));
+  }
+}
+
 async function setOutcome(id: string, outcome: string) {
   await query('UPDATE dbo.approvals SET outcome = ? WHERE id = ?', [outcome, id]);
   publish('approval', await getApproval(id));
@@ -60,6 +75,26 @@ export async function decide(id: string, approve: boolean, note?: string): Promi
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');
   if (approval.status !== 'pending') throw new Error(`Approval already ${approval.status}`);
+
+  if (approval.kind === 'sn_confirm') {
+    // Answer first: if the chat is busy, this throws and the card stays pending.
+    const { conversationId, title } = JSON.parse(approval.payload) as { conversationId: string; title: string };
+    const reply = approve
+      ? `Yes, go ahead: ${title}${note ? ` (${note})` : ''}`
+      : `No, don't make this change: ${title}.${note ? ` ${note}` : ''}`;
+    const { sendMessage } = await import('./orchestrator.js');
+    await sendMessage(conversationId, reply, { answersApprovalId: id });
+    await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [
+      approve ? 'approved' : 'rejected',
+      note,
+      approve ? 'Approved in chat' : 'Rejected in chat',
+      id,
+    ]);
+    const updated = (await getApproval(id))!;
+    publish('approval', updated);
+    return updated;
+  }
+
   await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [
     approve ? 'approved' : 'rejected',
     note,
