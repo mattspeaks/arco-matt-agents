@@ -7,7 +7,13 @@ import { startWorkerRun } from './workers.js';
 
 // sn_confirm: a ServiceNow change previewed in chat. Deciding it answers in that chat as Matt, so the orchestrator
 // (and anyone reading the conversation) sees his "yes" or "no" right where the change happens.
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson';
+// pbi_*: the Power BI story workflow's cards (pbi/flow.ts). pbi_start, pbi_review and pbi_revise also authorise the
+// lane move and acceptance-criteria update they describe, in the chat turn the click starts.
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish';
+
+/** Cards whose click starts a chat turn that may write to ServiceNow (see /api/agent/write_permit). */
+export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise'];
+const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish'];
 
 export interface Approval {
   id: string;
@@ -55,7 +61,7 @@ export async function listApprovals(status?: string): Promise<Approval[]> {
 /** A newer preview in the same chat replaces older pending cards, so only the latest can be approved. */
 export async function supersedeChatApprovals(conversationId: string, exceptId?: string) {
   const rows = await query<Approval>(
-    `SELECT * FROM dbo.approvals WHERE kind = 'sn_confirm' AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ?`,
+    `SELECT * FROM dbo.approvals WHERE kind IN ('sn_confirm', 'pbi_start', 'pbi_revise') AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ?`,
     [conversationId],
   );
   for (const a of rows) {
@@ -65,16 +71,31 @@ export async function supersedeChatApprovals(conversationId: string, exceptId?: 
   }
 }
 
-async function setOutcome(id: string, outcome: string) {
+export async function setOutcome(id: string, outcome: string) {
   await query('UPDATE dbo.approvals SET outcome = ? WHERE id = ?', [outcome, id]);
   publish('approval', await getApproval(id));
 }
 
 /** Matt's decision. Approval executes the action; nothing in the agent layer can call this. */
-export async function decide(id: string, approve: boolean, note?: string): Promise<Approval> {
+export async function decide(id: string, approve: boolean, note?: string, extra: { workspaceId?: string } = {}): Promise<Approval> {
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');
   if (approval.status !== 'pending') throw new Error(`Approval already ${approval.status}`);
+
+  if (FLOW_KINDS.includes(approval.kind)) {
+    // The flow acts first (and may throw, e.g. the chat is busy); only then is the card marked.
+    const { decideFlowCard } = await import('./pbi/flow.js');
+    const outcome = await decideFlowCard(approval, approve, note, extra);
+    await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = COALESCE(outcome, ?), decided_at = SYSUTCDATETIME() WHERE id = ?', [
+      approve ? 'approved' : 'rejected',
+      note,
+      outcome,
+      id,
+    ]);
+    const updated = (await getApproval(id))!;
+    publish('approval', updated);
+    return updated;
+  }
 
   if (approval.kind === 'sn_confirm') {
     // Answer first: if the chat is busy, this throws and the card stays pending.

@@ -80,7 +80,12 @@ export async function postApprovalCard(conversationId: string, approvalId: strin
   await addMessage(conversationId, 'approval', approvalId);
 }
 
-async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error' | 'approval', content: string, runId?: string) {
+/** A progress note from the app itself (the Power BI workflow). It doesn't start a turn. */
+export async function postAppNote(conversationId: string, text: string) {
+  await addMessage(conversationId, 'app', text);
+}
+
+async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error' | 'approval' | 'app', content: string, runId?: string) {
   const [row] = await query(
     `INSERT INTO dbo.chat_messages (conversation_id, role, content, run_id)
      OUTPUT inserted.id, inserted.conversation_id, inserted.role, inserted.content, inserted.run_id, inserted.created_at
@@ -90,6 +95,27 @@ async function addMessage(conversationId: string, role: 'user' | 'assistant' | '
   await query('UPDATE dbo.conversations SET updated_at = SYSUTCDATETIME() WHERE id = ?', [conversationId]);
   publish('chat_message', row);
 }
+
+// The Power BI report workflow (pbi/flow.ts). The app pulls, runs the loop and publishes; the orchestrator plans,
+// talks to Matt and makes the ServiceNow moves his card clicks authorise.
+const REPORT_WORKFLOW = `### Power BI report work in this chat
+When the story is about changing an existing Power BI report:
+1. Find the report: \`list_fabric_items\` (no args lists workspaces, a workspace lists its reports and models). Agree the
+   plan with Matt.
+2. Call \`propose_report_work\` with the workspace, the report, the plan, and the Work in progress work note. Then end
+   your turn. The start card covers the whole run.
+3. When Matt approves, his message asks you to move the story to Work in progress. Do that (servicenow skill), resync,
+   and end the turn. Don't wait for the app: it pulls the report and runs builder ⇄ QC itself, posting notes here.
+4. A Review report card follows. When Matt opens it, his message asks you to move the story to Ready for testing
+   with the summary he gives you. Write the work note in the standard format.
+5. If Matt clicks Not ready: move the story back to Work in progress, then **interview him**. Ask focused questions
+   in rounds until you have a complete, unambiguous list of changes. Then call \`submit_revision\` with the changes
+   and the text to add to the acceptance criteria, and end your turn. When he approves, update the acceptance
+   criteria (append; keep what's there) and resync.
+6. Approve on the Review card leads to a Publish card where Matt picks the workspace. The app publishes and opens
+   the PR. Never merge it, and never publish or update an app.
+\`get_report_flow\` shows where the workflow is. Don't start pbi-builder or pbi-qc yourself for a report that's in this
+workflow: the app runs them.`;
 
 function systemPrompt(conv: Conversation): string {
   const base = readFileSync(resolve(REPO_ROOT, 'prompts/orchestrator.md'), 'utf8');
@@ -101,7 +127,9 @@ function systemPrompt(conv: Conversation): string {
 This chat is dedicated to **${conv.story_number}**. Keep everything here about that story: triage, plan, decisions,
 workers (start_worker defaults to this story), work notes and lane moves, and time logged against it. If Matt asks
 about unrelated work, help briefly, and suggest the main chat or that story's own chat for anything substantial.
-Start by reading the story (get_story, then live details via the servicenow skill if you need them).`
+Start by reading the story (get_story, then live details via the servicenow skill if you need them).
+
+${REPORT_WORKFLOW}`
     : `
 
 ## This conversation: main chat

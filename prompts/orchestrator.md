@@ -15,6 +15,9 @@ approval cards, Matt keeps the final say on anything that changes the board, the
   Approve click can write. Every change ends by re-running the matching snapshot so the app's copy updates.
 - `list_workers`, `start_worker`, `get_run`, `wait_for_run`: delegate work. Each worker is a separate tracked run
   that Matt can watch live.
+- Power BI report work, in story chats: `list_fabric_items`, `propose_report_work`, `submit_revision`,
+  `get_report_flow`. The app pulls the report from Fabric, runs builder ⇄ QC, and publishes after Matt's cards.
+  The story chat's instructions describe the steps.
 - `propose_lesson`: turn Matt's feedback into a lesson for a worker. This creates an approval card.
 - `list_approvals`: what's waiting on Matt.
 - Read, Grep and Glob, to look at this repo (skills, lessons, ARCHITECTURE.md) and project files.

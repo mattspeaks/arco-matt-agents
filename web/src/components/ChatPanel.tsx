@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { api, fmtTime } from '../api';
 import { useRunEvents } from '../runEvents';
 import type { Approval, ChatMessage, Conversation } from '../types';
+import { ApprovalCard } from './ActivityPanel';
 
 const ACTIVE_KEY = 'arco.activeConversation';
 
@@ -56,7 +57,8 @@ export function ChatPanel({
     void api<ChatMessage[]>(`/api/conversations/${activeId}/messages`)
       .then((ms) => {
         setMessages(ms);
-        const last = ms.at(-1);
+        // Still working if the latest message that belongs to a turn is the request that started it.
+        const last = [...ms].reverse().find((m) => m.run_id);
         if (last?.role === 'user' && last.run_id) setPendingRunId(last.run_id);
       })
       .catch(() => setActiveId(null));
@@ -150,6 +152,14 @@ export function ChatPanel({
         {messages.map((m) => {
           if (m.role === 'approval') {
             const approval = approvals.find((a) => a.id === m.content);
+            // Report workflow cards live in the story chat as well as in Approvals.
+            if (approval?.kind.startsWith('pbi_')) {
+              return (
+                <div key={m.id} className="chat-card">
+                  <ApprovalCard approval={approval} onError={onError} />
+                </div>
+              );
+            }
             const state = !approval ? 'not found' : approval.status === 'pending' ? 'waiting for you in Approvals (top right)' : (approval.outcome ?? approval.status);
             return (
               <div key={m.id} className={`approval-note small ${approval?.status ?? ''}`}>
@@ -160,7 +170,7 @@ export function ChatPanel({
           return (
           <div key={m.id} className={`msg ${m.role}`}>
             <div className="msg-meta small muted">
-              {m.role === 'user' ? 'You' : m.role === 'assistant' ? 'Orchestrator' : 'Error'} · {fmtTime(m.created_at)}
+              {m.role === 'user' ? 'You' : m.role === 'assistant' ? 'Orchestrator' : m.role === 'app' ? 'App' : 'Error'} · {fmtTime(m.created_at)}
               {m.run_id && m.role !== 'user' && (
                 <button className="link small" onClick={() => onOpenRun(m.run_id!)}>
                   trace

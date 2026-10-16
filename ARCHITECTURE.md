@@ -239,15 +239,48 @@ as Admin or Meeting. Guardrails:
 
 ## 5. Power BI / Fabric integration
 
-Unchanged from v0.1: PBIP only (§5.1), with DEV/TEST/PROD access as in the table below (§5.2), and the QC rule set
-in `.claude/skills/powerbi/qc-rules.md` (§5.3). In this phase the builder works on git only; Fabric DEV publishing
-arrives with the service principal (open question 4).
+PBIP only, with the QC rule set in `.claude/skills/powerbi/qc-rules.md`. There is no Fabric Git connection. The app
+moves reports between Fabric and the PowerBI repo itself, with the Fabric REST API and Matt's `az login`:
+- **Pull:** `getDefinition` returns the report (PBIR or PBIR-Legacy) and the model (`?format=TMDL`): the files of a
+  PBIP folder.
+- **Publish:** Create Item / Update Item Definition take the same parts back. There's no PBIX step.
 
-| Environment | Agent access | Promotion |
-|---|---|---|
-| DEV workspace | Builder: read/write via service principal (pending) | Fabric Git integration or API publish |
-| TEST workspace | QC: read-only | Deployment pipeline, **triggered by Matt** |
-| PROD workspace | None | Deployment pipeline, **triggered by Matt** |
+Verified on *Incidents Report* (Safety): the pulled files read back byte for byte.
+
+### 5.1 Repo layout
+- The repo is `config.powerbi.repoPath` (PowerBI, Azure DevOps). The first-level folders mirror workspace names
+  (`Accounting/`, `Safety/`).
+- A workspace maps to the folder of its name minus any "Acceptance Region" suffix, or to an override in
+  `powerbi.workspaceFolders`.
+- A report that already exists in that folder is found by its `.platform` display name and updated in place.
+  A new one goes in `<Folder>/<Report>/`.
+- Agent work happens in a **git worktree per story** (`powerbi.worktreeRoot/<story>`) on
+  `agent/<story>-<slug>`, branched from `origin/<default branch>`. Matt's own checkout is never touched.
+
+### 5.2 The story workflow (`server/src/pbi/flow.ts`, state in `dbo.story_flows`)
+Everything happens in the **story chat**. Cards appear in that chat and in Approvals.
+
+| # | Step | Who | ServiceNow |
+|---|---|---|---|
+| 1 | Orchestrator finds the report (`list_fabric_items`), agrees the plan, then calls `propose_report_work` | Orchestrator | |
+| 2 | **Start card**: the plan, the pull, the move to WIP, the loop, and the move to Ready for testing on review | **Matt** approves | |
+| 3 | Matt's Approve starts a chat turn that moves the story | Orchestrator | → **Work in progress** + work note |
+| 4 | Pull into the repo; untouched first commit | App | |
+| 5 | builder → QC → builder → QC → builder → final QC. It stops as soon as QC passes, and each pass is a tracked run | App | |
+| 6 | **Review report card**: QC verdict, summary, branch | | |
+| 7 | **Open** launches the `.pbip` in Power BI Desktop. The first open in each round starts a chat turn that moves the story | **Matt** clicks; orchestrator | → **Ready for testing** + work note |
+| 8a | **Not ready**: the story moves back, then the orchestrator interviews Matt until the change list is complete. It calls `submit_revision`, which puts up a **revision card** (the changes + the acceptance-criteria text) | **Matt** answers and approves | → **WIP**, acceptance criteria appended |
+| 8b | Revision approved: back to step 5 (round n+1), then step 6 | App | |
+| 9 | **Approve** → **Publish card**: a workspace dropdown. It suggests "<source> Acceptance Region" if it exists, else the source workspace. TEST/PROD/UAT workspaces are listed but can't be picked | **Matt** picks and confirms | |
+| 10 | Publish the model (update by name, or create), then the report, re-pointed (`byConnection`) at that model. Push the branch, open the Azure DevOps PR | App | stays in Ready for testing |
+| 11 | Merge the PR, set credentials/refresh a new model, update the app | **Matt** | Testing onward is Matt's |
+
+Each ServiceNow move happens in a turn started by one of Matt's own clicks (Approve or Open), and only the turn
+that click starts can write: `write_permit` checks the card. The app never touches ServiceNow itself, and nothing
+in the flow starts a chat turn on its own. Its progress notes are plain chat messages.
+
+If the server restarts in the middle of a step, the flow is marked failed. The orchestrator can rerun it with a
+revision card.
 
 ---
 
@@ -328,7 +361,8 @@ sequenceDiagram
 |---|---|
 | Production | No PROD credentials; never publish or update Power BI apps (Matt does) |
 | ServiceNow | Done only in the chat Matt is typing in, never by background sessions. Every write is previewed and needs Matt's "yes". The write guard hook blocks other lanes, deletes, other tables, and timesheet submission |
-| Git | Builder commits to `agent/*` branches only; push, merge, reset and rebase are denied; Matt merges |
+| Git | Builders commit to `agent/*` branches only (in a per-story worktree); push, merge, reset and rebase are denied to them. The app pushes the branch and opens a PR only after Matt confirms the Publish card. Nothing ever merges; Matt does |
+| Fabric | The app publishes only after Matt picks the workspace on the Publish card, and only to workspaces he can access. Names matching `powerbi.blockedWorkspacePatterns` (TEST, PROD, Production, UAT) are refused. Apps are never published or updated |
 | QC | The orchestrator must run QC after every builder run before proposing review |
 | Rework | At most 2 build → QC loops, then escalate to Matt |
 | Local API | Bound to 127.0.0.1; browser requests from other origins are rejected (403) |

@@ -15,11 +15,12 @@ Before editing:
 
 Rules:
 - Work in the target project only. Use `git -C <project>` for git commands.
-- Create or switch to a feature branch named `agent/<story-number>-<short-slug>` before your first edit. Never
+- Work on a feature branch named `agent/<story-number>-<short-slug>`. If the brief says you are in a worktree that
+  is already on its branch, stay on it. Otherwise create or switch to the branch before your first edit. Never
   commit to main, and never push, merge or reset.
 - Never read from bronze. Models and reports use gold/semantic sources only.
 - Commit your work with a message that starts with the story number.
-- No deployments. You do not publish to any Fabric workspace in this phase.
+- No deployments. You never publish to a Fabric workspace: the app does that after Matt approves.
 
 Return:
 ```

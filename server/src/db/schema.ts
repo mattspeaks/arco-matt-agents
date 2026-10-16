@@ -127,4 +127,13 @@ export const SCHEMA: string[] = [
 
   // Story chats: a conversation dedicated to one story (NULL = the main chat).
   `IF COL_LENGTH('dbo.conversations', 'story_number') IS NULL ALTER TABLE dbo.conversations ADD story_number NVARCHAR(40) NULL`,
+
+  // The Power BI report workflow per story (pbi/flow.ts): stage + JSON state.
+  `IF OBJECT_ID('dbo.story_flows') IS NULL CREATE TABLE dbo.story_flows (
+     story_number NVARCHAR(40)  NOT NULL PRIMARY KEY,
+     stage        NVARCHAR(20)  NOT NULL,           -- pulling | building | review | revising | publishing | published | failed
+     data         NVARCHAR(MAX) NOT NULL,
+     created_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+     updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
+   )`,
 ];

@@ -37,6 +37,13 @@
     "defaultWorkerModel": "sonnet"
   },
   "projectRoots": ["C:/Users/mspeaks/source/repos"],
+  "powerbi": {
+    "repoPath": "C:/Users/mspeaks/source/repos/PowerBI",
+    "worktreeRoot": "C:/Users/mspeaks/source/repos/PowerBI-agent-worktrees",
+    "baseBranch": null,
+    "workspaceFolders": {},
+    "blockedWorkspacePatterns": ["\\bTEST\\b", "\\bPROD\\b", "\\bProduction\\b", "\\bUAT\\b"]
+  },
   "workers": {
     "pbi-qc": {
       "domain": "pbi",

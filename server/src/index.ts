@@ -4,7 +4,8 @@ import { bus } from './bus.js';
 import { config } from './config.js';
 import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
-import { createApproval, decide, getApproval, listApprovals, supersedeChatApprovals } from './approvals.js';
+import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
+import { flowSummary, getFlow, listFabric, openForReview, proposeReportWork, publishTargets, recoverInterruptedFlows, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
 import { createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
@@ -13,6 +14,7 @@ import { listWorkers, requestWorker } from './workers.js';
 
 await initDb();
 await recoverInterruptedRuns();
+await recoverInterruptedFlows();
 
 const app = Fastify({ logger: { level: 'warn' } });
 await app.register(websocket);
@@ -73,9 +75,16 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string } }>('/api/approvals/:id/decision', async (req) =>
-  decide(req.params.id, Boolean(req.body?.approve), req.body?.note),
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string } }>('/api/approvals/:id/decision', async (req) =>
+  decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId }),
 );
+
+// ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------
+app.get<{ Params: { number: string } }>('/api/flows/:number', async (req) => (await getFlow(req.params.number)) ?? null);
+// The Review card's Open button: launches the .pbip in Power BI Desktop (and asks the chat for the lane move).
+app.post<{ Params: { number: string } }>('/api/flows/:number/open', async (req) => openForReview(req.params.number));
+// The Publish card's dropdown.
+app.get<{ Querystring: { story?: string } }>('/api/fabric/workspaces', async (req) => publishTargets(req.query.story));
 
 app.get('/api/workers', async () => listWorkers());
 
@@ -164,7 +173,9 @@ app.get<{ Querystring: { run?: string } }>('/api/agent/write_permit', async (req
   if (!run) return { ok: false, reason: 'unknown run' };
   const approvalId = parseMeta<{ answersApprovalId?: string }>(run).answersApprovalId;
   const approval = approvalId ? await getApproval(approvalId) : undefined;
-  if (approval?.kind === 'sn_confirm' && approval.status === 'approved') return { ok: true, approval: approval.title };
+  // "Not ready" on a Review card authorises moving the story back to Work in progress, so a rejected one counts too.
+  const granted = approval && SN_PERMIT_KINDS.includes(approval.kind) && (approval.status === 'approved' || (approval.kind === 'pbi_review' && approval.status === 'rejected'));
+  if (granted) return { ok: true, approval: approval.title };
   return {
     ok: false,
     reason:
@@ -188,6 +199,26 @@ app.post<{ Body: AgentBody }>('/api/agent/propose_lesson', async (req) => {
 });
 
 app.post('/api/agent/list_approvals', async () => listApprovals('pending'));
+
+const agentCall = async <T>(fn: () => Promise<T>) => {
+  try {
+    return await fn();
+  } catch (err) {
+    throw bad((err as Error).message);
+  }
+};
+app.post<{ Body: AgentBody }>('/api/agent/list_fabric_items', async (req) => agentCall(() => listFabric(str(req.body.workspace))));
+app.post<{ Body: AgentBody }>('/api/agent/propose_report_work', async (req) => {
+  const [workspace, report, plan, workNote] = [str(req.body.workspace), str(req.body.report), str(req.body.plan), str(req.body.work_note)];
+  if (!workspace || !report || !plan || !workNote) throw bad('workspace, report, plan and work_note are required');
+  return agentCall(() => proposeReportWork({ parentRunId: req.body.parentRunId, workspace, report, plan, workNote }));
+});
+app.post<{ Body: AgentBody }>('/api/agent/submit_revision', async (req) => {
+  const [changes, acceptanceCriteria] = [str(req.body.changes), str(req.body.acceptance_criteria)];
+  if (!changes || !acceptanceCriteria) throw bad('changes and acceptance_criteria are required');
+  return agentCall(() => submitRevision({ parentRunId: req.body.parentRunId, changes, acceptanceCriteria }));
+});
+app.post<{ Body: AgentBody }>('/api/agent/get_report_flow', async (req) => agentCall(() => flowSummary(req.body.parentRunId)));
 
 // Localhost only: this API can drive your browser session and start agents.
 await app.listen({ port: config.server.port, host: '127.0.0.1' });

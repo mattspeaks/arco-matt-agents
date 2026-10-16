@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
+import { PublishCard, ReviewCard } from './FlowCards';
 
 const KIND_LABEL: Record<Run['kind'], string> = { sync: 'Sync', orchestrator: 'Chat', worker: 'Worker', sn_write: 'SN write' };
 
@@ -92,7 +93,23 @@ function RunRow({ run, onOpen }: { run: Run; onOpen: (id: string) => void }) {
 
 const DECIDED_LABEL: Record<Approval['status'], string> = { pending: '', approved: 'Approved', rejected: 'Rejected', superseded: 'Replaced by a newer preview' };
 
+const KIND_TITLE: Partial<Record<Approval['kind'], string>> = {
+  sn_write: 'ServiceNow change',
+  sn_confirm: 'ServiceNow change',
+  timesheet_write: 'Timesheet entry',
+  start_worker: 'Start worker',
+  lesson: 'New lesson',
+  pbi_start: 'Start report work',
+  pbi_revise: 'Revise report',
+};
+
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
+  if (approval.kind === 'pbi_review') return <ReviewCard approval={approval} onError={onError} />;
+  if (approval.kind === 'pbi_publish') return <PublishCard approval={approval} onError={onError} />;
+  return <BasicApprovalCard approval={approval} onError={onError} />;
+}
+
+function BasicApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const p = parseJson<Record<string, string | undefined>>(approval.payload, {});
@@ -109,17 +126,9 @@ export function ApprovalCard({ approval, onError }: { approval: Approval; onErro
 
   return (
     <div className={`approval ${approval.kind}`}>
-      <div className="approval-kind small">
-        {approval.kind === 'sn_write' || approval.kind === 'sn_confirm'
-          ? 'ServiceNow change'
-          : approval.kind === 'timesheet_write'
-            ? 'Timesheet entry'
-            : approval.kind === 'start_worker'
-              ? 'Start worker'
-              : 'New lesson'}
-      </div>
+      <div className="approval-kind small">{KIND_TITLE[approval.kind] ?? approval.kind}</div>
       <div className="approval-title">{approval.title}</div>
-      {approval.kind === 'sn_confirm' && p.preview && (
+      {['sn_confirm', 'pbi_start', 'pbi_revise'].includes(approval.kind) && p.preview && (
         <div className="approval-preview md small">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
         </div>
@@ -200,6 +209,7 @@ export function ApprovalCard({ approval, onError }: { approval: Approval; onErro
         <div className={`approval-decided small ${approval.status}`}>
           {DECIDED_LABEL[approval.status]}
           {approval.decision_note ? `: ${approval.decision_note}` : ''}
+          {approval.outcome && approval.kind.startsWith('pbi_') && <div className="muted">{approval.outcome}</div>}
         </div>
       )}
     </div>

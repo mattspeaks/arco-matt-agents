@@ -32,6 +32,17 @@ export interface AppConfig {
   };
   claude: { bin: string; syncModel: string; orchestratorModel: string; defaultWorkerModel: string };
   projectRoots: string[];
+  powerbi: {
+    repoPath: string;
+    /** Per-story git worktrees of the PowerBI repo (agent branches). */
+    worktreeRoot: string;
+    /** PR target; null = the remote's default branch. */
+    baseBranch: string | null;
+    /** Workspace name → repo folder, where the default (name minus "Acceptance Region") isn't right. */
+    workspaceFolders: Record<string, string>;
+    /** Regexes (case-sensitive) for workspaces agents never publish to. */
+    blockedWorkspacePatterns: string[];
+  };
   workers: Record<string, WorkerConfig>;
 }
 

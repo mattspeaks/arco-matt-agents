@@ -114,4 +114,46 @@ server.registerTool(
 
 server.registerTool('list_approvals', { description: 'Pending approval cards waiting on Matt.' }, () => call('list_approvals'));
 
+// ---- Power BI report workflow (story chats only) ----
+server.registerTool(
+  'list_fabric_items',
+  {
+    description: 'Fabric, read-only. With no workspace: the workspaces Matt can access. With a workspace (id or name): its reports and semantic models, and the PowerBI repo folder it maps to.',
+    inputSchema: { workspace: z.string().optional() },
+  },
+  (args) => call('list_fabric_items', args),
+);
+
+server.registerTool(
+  'propose_report_work',
+  {
+    description:
+      "Story chats only. Puts the start card for changing an existing Power BI report in Matt's Approvals: the plan, the pull from Fabric into the PowerBI repo, the move to Work in progress, the builder/QC loop, and the Review card. END YOUR TURN after calling it.",
+    inputSchema: {
+      workspace: z.string().describe('Workspace id or name the report lives in'),
+      report: z.string().describe('Report id or name'),
+      plan: z.string().describe('Markdown: what will change and how, the builder brief in Matt-readable form'),
+      work_note: z.string().describe('The exact Work in progress work note, in the standard [Agent: Power BI Manager] format'),
+    },
+  },
+  (args) => call('propose_report_work', args),
+);
+
+server.registerTool(
+  'submit_revision',
+  {
+    description:
+      'Story chats only, after Matt clicks Not ready and you have interviewed him. Puts the revision card in his Approvals: the changes, the text to append to the acceptance criteria, then another builder/QC loop. END YOUR TURN after calling it.',
+    inputSchema: {
+      changes: z.string().describe('Markdown: the complete, numbered list of changes, specific enough for the builder'),
+      acceptance_criteria: z.string().describe('Text to append to the story acceptance criteria, exactly as it will be written'),
+    },
+  },
+  (args) => call('submit_revision', args),
+);
+
+server.registerTool('get_report_flow', { description: "Story chats only. Where this story's Power BI report workflow is: stage, branch, paths, last builder/QC results, PR." }, () =>
+  call('get_report_flow'),
+);
+
 await server.connect(new StdioServerTransport());

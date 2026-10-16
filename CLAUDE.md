@@ -9,7 +9,10 @@ Project rules for every Claude session in this repo: the orchestrator, workers, 
 - ServiceNow is touched only in the orchestrator chat, in response to Matt's own messages, following the
   `servicenow` skill. Every write needs an approval card that Matt has approved. No background session or worker
   touches ServiceNow. `server/hooks/sn-write-guard.mjs` blocks forbidden writes. Never work around it.
-- Builders commit only to `agent/<story>-<slug>` branches. Never push, merge, reset or rebase.
+- Builders commit only to `agent/<story>-<slug>` branches. Never push, merge, reset or rebase. Only the app pushes,
+  and only after Matt confirms a Publish card. It opens the PR and never merges it.
+- Fabric publishing is done by the app (`server/src/pbi/flow.ts`), only to the workspace Matt picks on the Publish
+  card, and never to a workspace matching `powerbi.blockedWorkspacePatterns`.
 - Models and reports never read from bronze.
 - No secrets in the repo. Auth is Windows (SQL Server) and the user's Claude Code login.
 
