@@ -7,7 +7,7 @@ Project rules for every Claude session in this repo: the orchestrator, workers, 
 - Never move a ServiceNow story to Testing, Deploy/Launch, Complete or Cancelled. Agents only *propose* changes
   through the app, and Matt approves them.
 - ServiceNow is touched only in the orchestrator chat, in response to Matt's own messages, following the
-  `servicenow` skill. Every write is previewed and needs Matt's explicit "yes". No background session or worker
+  `servicenow` skill. Every write needs an approval card that Matt has approved. No background session or worker
   touches ServiceNow. `server/hooks/sn-write-guard.mjs` blocks forbidden writes. Never work around it.
 - Builders commit only to `agent/<story>-<slug>` branches. Never push, merge, reset or rebase.
 - Models and reports never read from bronze.

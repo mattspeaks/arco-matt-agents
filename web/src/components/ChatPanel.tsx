@@ -4,7 +4,6 @@ import remarkGfm from 'remark-gfm';
 import { api, fmtTime } from '../api';
 import { useRunEvents } from '../runEvents';
 import type { Approval, ChatMessage, Conversation } from '../types';
-import { ApprovalCard } from './ActivityPanel';
 
 const ACTIVE_KEY = 'arco.activeConversation';
 
@@ -19,15 +18,15 @@ function loadActive(): string | null {
 export function ChatPanel({
   conversations,
   approvals,
-  draft,
-  onDraftConsumed,
+  focus,
+  onFocusConsumed,
   onOpenRun,
   onError,
 }: {
   conversations: Conversation[];
   approvals: Approval[];
-  draft: string | null;
-  onDraftConsumed: () => void;
+  focus: { conversationId: string; draft?: string } | null;
+  onFocusConsumed: () => void;
   onOpenRun: (id: string) => void;
   onError: (msg: string) => void;
 }) {
@@ -77,12 +76,12 @@ export function ChatPanel({
   }, [activeId]);
 
   useEffect(() => {
-    if (draft) {
-      setText(draft);
-      onDraftConsumed();
-      inputRef.current?.focus();
-    }
-  }, [draft, onDraftConsumed]);
+    if (!focus) return;
+    setActiveId(focus.conversationId);
+    if (focus.draft) setText(focus.draft);
+    onFocusConsumed();
+    inputRef.current?.focus();
+  }, [focus, onFocusConsumed]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -117,11 +116,24 @@ export function ChatPanel({
       <div className="panel-head">
         <select className="input select" value={activeId ?? ''} onChange={(e) => setActiveId(e.target.value || null)} aria-label="Conversation">
           {!conversations.length && <option value="">No conversations yet</option>}
-          {conversations.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.title}
-            </option>
-          ))}
+          {conversations.some((c) => !c.story_number) && (
+            <optgroup label="Main">
+              {conversations.filter((c) => !c.story_number).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {conversations.some((c) => c.story_number) && (
+            <optgroup label="Stories">
+              {conversations.filter((c) => c.story_number).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.busy_run_id ? '● ' : ''}{c.title}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
         <button className="btn ghost" onClick={() => void newConversation()}>
           + New
@@ -138,9 +150,10 @@ export function ChatPanel({
         {messages.map((m) => {
           if (m.role === 'approval') {
             const approval = approvals.find((a) => a.id === m.content);
+            const state = !approval ? 'not found' : approval.status === 'pending' ? 'waiting for you in Approvals (top right)' : (approval.outcome ?? approval.status);
             return (
-              <div key={m.id} className="msg approval-msg">
-                {approval ? <ApprovalCard approval={approval} onError={onError} /> : <p className="muted small">Approval card not found.</p>}
+              <div key={m.id} className={`approval-note small ${approval?.status ?? ''}`}>
+                Approval requested: <strong>{approval?.title ?? '…'}</strong> · {state}
               </div>
             );
           }

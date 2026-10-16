@@ -25,7 +25,8 @@ export function App() {
   const [connected, setConnected] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [openStory, setOpenStory] = useState<Story | null>(null);
-  const [chatDraft, setChatDraft] = useState<string | null>(null);
+  // Switches the chat panel to a conversation (e.g. a story chat), optionally with a draft message.
+  const [chatFocus, setChatFocus] = useState<{ conversationId: string; draft?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadBoard = useCallback(() => {
@@ -103,8 +104,8 @@ export function App() {
         <ChatPanel
           conversations={conversations}
           approvals={approvals}
-          draft={chatDraft}
-          onDraftConsumed={() => setChatDraft(null)}
+          focus={chatFocus}
+          onFocusConsumed={() => setChatFocus(null)}
           onOpenRun={setOpenRunId}
           onError={setError}
         />
@@ -120,9 +121,18 @@ export function App() {
           runs={runs.filter((r) => r.story_number === openStory.number)}
           onClose={() => setOpenStory(null)}
           onOpenRun={setOpenRunId}
-          onDiscuss={(text) => {
-            setChatDraft(text);
-            setOpenStory(null);
+          hasChat={conversations.some((c) => c.story_number === openStory.number)}
+          onDiscuss={() => {
+            const story = openStory;
+            api<Conversation & { created: boolean }>(`/api/stories/${story.number}/conversation`, { body: {} })
+              .then((conv) => {
+                setChatFocus({
+                  conversationId: conv.id,
+                  draft: conv.created ? `Let's work on ${story.number} (${story.short_description}). Read the story and propose a plan.` : undefined,
+                });
+                setOpenStory(null);
+              })
+              .catch((e) => setError((e as Error).message));
           }}
         />
       )}

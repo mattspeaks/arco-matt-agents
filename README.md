@@ -32,7 +32,7 @@ Open http://127.0.0.1:5173, click **Sync ServiceNow**, then talk to the orchestr
 - Agent runs count against your Claude plan's usage limits. The "est. $" figures are Claude Code's estimates, not
   bills.
 - ServiceNow work happens in the chat. **Sync ServiceNow** posts a request from you into the "ServiceNow refresh"
-  chat. Changes (lane moves, work notes, hours) are previewed in chat, and nothing is saved until you reply "yes".
+  chat. Changes (lane moves, work notes, hours) show up as cards in **Approvals** (top right), and nothing is saved until you click Approve.
 
 ## Where things live
 

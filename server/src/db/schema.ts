@@ -124,4 +124,7 @@ export const SCHEMA: string[] = [
      status       NVARCHAR(20)   NOT NULL,           -- proposed | approved | rejected
      created_at   DATETIME2      NOT NULL DEFAULT SYSUTCDATETIME()
    )`,
+
+  // Story chats: a conversation dedicated to one story (NULL = the main chat).
+  `IF COL_LENGTH('dbo.conversations', 'story_number') IS NULL ALTER TABLE dbo.conversations ADD story_number NVARCHAR(40) NULL`,
 ];

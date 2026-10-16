@@ -10,6 +10,7 @@ export function StoryDrawer({
   runs,
   onClose,
   onOpenRun,
+  hasChat,
   onDiscuss,
 }: {
   story: Story;
@@ -18,7 +19,8 @@ export function StoryDrawer({
   runs: Run[];
   onClose: () => void;
   onOpenRun: (id: string) => void;
-  onDiscuss: (text: string) => void;
+  hasChat: boolean;
+  onDiscuss: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -56,8 +58,8 @@ export function StoryDrawer({
         </div>
         <div className="drawer-body">
           <div className="row-actions">
-            <button className="btn primary" onClick={() => onDiscuss(`Let's look at ${story.number} (${story.short_description}). `)}>
-              Discuss with orchestrator
+            <button className="btn primary" onClick={onDiscuss}>
+              {hasChat ? 'Open story chat' : 'Discuss with orchestrator'}
             </button>
           </div>
           {!story.domain && (

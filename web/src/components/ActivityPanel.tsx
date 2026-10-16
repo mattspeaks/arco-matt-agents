@@ -90,7 +90,7 @@ function RunRow({ run, onOpen }: { run: Run; onOpen: (id: string) => void }) {
   );
 }
 
-const DECIDED_LABEL: Record<Approval['status'], string> = { pending: '', approved: 'Approved', rejected: 'Rejected', superseded: 'Answered in chat' };
+const DECIDED_LABEL: Record<Approval['status'], string> = { pending: '', approved: 'Approved', rejected: 'Rejected', superseded: 'Replaced by a newer preview' };
 
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const [note, setNote] = useState('');

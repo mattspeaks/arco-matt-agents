@@ -4,6 +4,7 @@
 //   - story state only to the allow-listed lanes (config: servicenow.agentAllowedStateValues)
 //   - never change the time_sheet record or a time card's state (submitting is Matt's)
 //   - no form submits from script
+//   - only in the turn Matt started by clicking Approve on an approval card (asks the app: /api/agent/write_permit)
 // Exit 2 blocks the call and shows the reason to Claude. Reads pass straight through.
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -47,5 +48,16 @@ process.stdin.on('end', () => {
   if (tables.has('time_card') && /['"]?\bstate['"]?\s*:/.test(code)) block("a time card's state is never changed (Matt submits)");
   for (const s of states) if (!allowedStates.has(s)) block(`story state ${s} is Matt's lane; agents may only set ${[...allowedStates].join(', ')}`);
   if (tables.has('rm_story') && /['"]?\bstate['"]?\s*:\s*[^'"`\-\d\s]/.test(code)) block('write story state as a literal value so it can be checked');
-  process.exit(0);
+
+  // Writes only happen in the turn Matt started by clicking Approve on the card (request_approval).
+  const api = process.env.ARCO_API ?? 'http://127.0.0.1:4317';
+  const runId = process.env.ARCO_RUN_ID;
+  if (!runId) block('no app run id, so the approval can\'t be checked');
+  fetch(`${api}/api/agent/write_permit?run=${encodeURIComponent(runId)}`)
+    .then((r) => r.json())
+    .then((permit) => {
+      if (permit?.ok) process.exit(0);
+      block(permit?.reason ?? 'no approved card for this change');
+    })
+    .catch(() => block("couldn't reach the app to check the approval"));
 });

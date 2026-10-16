@@ -52,7 +52,7 @@ export async function listApprovals(status?: string): Promise<Approval[]> {
     : query<Approval>('SELECT TOP 100 * FROM dbo.approvals ORDER BY created_at DESC');
 }
 
-/** Matt typed his own reply instead of clicking: pending in-chat cards for that conversation are answered. */
+/** A newer preview in the same chat replaces older pending cards, so only the latest can be approved. */
 export async function supersedeChatApprovals(conversationId: string, exceptId?: string) {
   const rows = await query<Approval>(
     `SELECT * FROM dbo.approvals WHERE kind = 'sn_confirm' AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ?`,
@@ -60,7 +60,7 @@ export async function supersedeChatApprovals(conversationId: string, exceptId?: 
   );
   for (const a of rows) {
     if (a.id === exceptId) continue;
-    await query(`UPDATE dbo.approvals SET status = 'superseded', outcome = 'Answered in chat', decided_at = SYSUTCDATETIME() WHERE id = ?`, [a.id]);
+    await query(`UPDATE dbo.approvals SET status = 'superseded', outcome = 'Replaced by a newer preview', decided_at = SYSUTCDATETIME() WHERE id = ?`, [a.id]);
     publish('approval', await getApproval(a.id));
   }
 }

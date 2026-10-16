@@ -97,6 +97,7 @@ export interface Conversation {
   id: string;
   title: string;
   session_id: string | null;
+  story_number: string | null; // a story chat; null = main chat
   updated_at: string;
   busy_run_id?: string;
 }

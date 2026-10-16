@@ -125,8 +125,14 @@ needs approval) is in `config/app.config.json` and is enforced by the runner thr
 ### 3.3 Approvals
 
 Approvals are the human checkpoint. ServiceNow changes are approved **in chat**: the orchestrator calls
-`request_approval`, which puts an Approve / Reject card (`sn_confirm`) inside the conversation. Clicking it posts Matt's
-answer ("Yes, go ahead: …" or "No, …") into the chat as his message, and typing "yes" works too (§4.1). The orchestrator can only *propose* the following; Matt approves or rejects them in the UI,
+`request_approval`, which puts an Approve / Reject card (`sn_confirm`) in the **Approvals** panel, with a one-line pointer
+in the chat. Clicking it posts Matt's answer ("Yes, go ahead: …" or "No, …") into that chat as his message. **Only the
+turn his Approve click starts can write:** the write guard asks `/api/agent/write_permit`, so a typed "yes" doesn't
+unlock writes. A newer preview in the same chat replaces older pending cards (§4.1).
+
+**Story chats.** "Discuss with orchestrator" on a story opens that story's own conversation (`conversations.story_number`),
+reopened every time. The orchestrator is told the chat is scoped to that story, and workers started there default to it.
+The main chat stays for general work: timesheet, board management, new stories. The orchestrator can only *propose* the following; Matt approves or rejects them in the UI,
 and only then does the app act:
 
 | Kind | Created by | On approve |

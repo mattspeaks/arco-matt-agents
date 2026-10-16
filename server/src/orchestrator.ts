@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { supersedeChatApprovals } from './approvals.js';
 import { publish } from './bus.js';
 import { API_BASE, config, REPO_ROOT } from './config.js';
 import { finishRun, isRunActive, runClaude, type StreamMessage } from './claude/runner.js';
@@ -14,6 +13,7 @@ export interface Conversation {
   id: string;
   title: string;
   session_id: string | null;
+  story_number: string | null; // set for a story chat; NULL for the main chat(s)
   created_at: string;
   updated_at: string;
 }
@@ -42,12 +42,21 @@ const SESSION_SETTINGS = {
 };
 const busy = new Map<string, string>(); // conversationId -> runId
 
-export async function createConversation(title = 'New conversation'): Promise<Conversation> {
+export async function createConversation(title = 'New conversation', storyNumber?: string): Promise<Conversation> {
   const id = randomUUID();
-  await query('INSERT INTO dbo.conversations (id, title) VALUES (?, ?)', [id, title]);
+  await query('INSERT INTO dbo.conversations (id, title, story_number) VALUES (?, ?, ?)', [id, title, storyNumber ?? null]);
   const conv = (await getConversation(id))!;
   publish('conversation', conv);
   return conv;
+}
+
+/** The story's own chat: reopened every time "Discuss with orchestrator" is clicked for that story. */
+export async function openStoryConversation(storyNumber: string): Promise<Conversation & { created: boolean }> {
+  const existing = await queryOne<Conversation>('SELECT TOP 1 * FROM dbo.conversations WHERE story_number = ? ORDER BY created_at', [storyNumber]);
+  if (existing) return { ...existing, created: false };
+  const story = await queryOne<{ short_description: string | null }>('SELECT short_description FROM dbo.stories WHERE number = ?', [storyNumber]);
+  const title = `${storyNumber}${story?.short_description ? ` · ${story.short_description}` : ''}`.slice(0, 200);
+  return { ...(await createConversation(title, storyNumber)), created: true };
 }
 
 export async function getConversation(id: string) {
@@ -82,10 +91,24 @@ async function addMessage(conversationId: string, role: 'user' | 'assistant' | '
   publish('chat_message', row);
 }
 
-function systemPrompt(): string {
+function systemPrompt(conv: Conversation): string {
   const base = readFileSync(resolve(REPO_ROOT, 'prompts/orchestrator.md'), 'utf8');
   const sn = config.servicenow;
-  return `${base}
+  const scope = conv.story_number
+    ? `
+
+## This conversation: story chat for ${conv.story_number}
+This chat is dedicated to **${conv.story_number}**. Keep everything here about that story: triage, plan, decisions,
+workers (start_worker defaults to this story), work notes and lane moves, and time logged against it. If Matt asks
+about unrelated work, help briefly, and suggest the main chat or that story's own chat for anything substantial.
+Start by reading the story (get_story, then live details via the servicenow skill if you need them).`
+    : `
+
+## This conversation: main chat
+General work: the board as a whole, timesheet, creating and triaging stories, questions. When Matt starts real work
+on a specific story, suggest its story chat ("Discuss with orchestrator" on the story) so that story's work stays
+together.`;
+  return `${base}${scope}
 
 ## Live configuration
 - Today: ${new Date().toISOString().slice(0, 10)}
@@ -144,8 +167,15 @@ export async function sendMessage(
     publish('conversation', await getConversation(conversationId));
   }
 
-  await supersedeChatApprovals(conversationId, opts.answersApprovalId);
-  const run = await createRun({ kind: opts.kind ?? 'orchestrator', title: text.slice(0, 120), conversationId, prompt: text });
+  // answersApprovalId marks the turn Matt started by clicking Approve: the only turn allowed to write (write_permit).
+  const run = await createRun({
+    kind: opts.kind ?? 'orchestrator',
+    title: text.slice(0, 120),
+    conversationId,
+    storyNumber: conv.story_number ?? undefined,
+    prompt: text,
+    meta: opts.answersApprovalId ? { answersApprovalId: opts.answersApprovalId } : undefined,
+  });
   busy.set(conversationId, run.id);
   await addMessage(conversationId, 'user', text, run.id);
 
@@ -155,7 +185,7 @@ export async function sendMessage(
     prompt: text,
     cwd: REPO_ROOT,
     model: config.claude.orchestratorModel,
-    appendSystemPrompt: systemPrompt(),
+    appendSystemPrompt: systemPrompt(conv),
     resumeSessionId: conv.session_id,
     chrome: true,
     settings: SESSION_SETTINGS,
@@ -177,7 +207,8 @@ export async function sendMessage(
       'Edit', 'Write', 'NotebookEdit', 'Bash', 'Task', 'Agent', 'WebFetch', 'WebSearch',
       'mcp__claude-in-chrome__form_input', 'mcp__claude-in-chrome__file_upload', 'mcp__claude-in-chrome__upload_image', 'mcp__claude-in-chrome__shortcuts_execute',
     ],
-    env: { MCP_TOOL_TIMEOUT: '900000' },
+    // ARCO_RUN_ID / ARCO_API let the write guard hook ask the app whether this turn may write.
+    env: { MCP_TOOL_TIMEOUT: '900000', ARCO_RUN_ID: run.id, ARCO_API: API_BASE },
   }))
     .then(async (res) => {
       await finishRun(run.id, res);

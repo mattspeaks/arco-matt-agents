@@ -8,7 +8,7 @@ There's no integration API access, so you work through **Matt's logged-in Chrome
 calls against ServiceNow's Table API from inside a ServiceNow tab, authenticated by the page's session token
 `window.g_ck`. This is faster and more accurate than reading the board UI.
 
-**Every write is previewed in chat and waits for Matt's explicit "yes" to that preview before anything is saved.**
+**Every write is previewed on an approval card and waits for Matt to click Approve before anything is saved.**
 
 ## Facts
 - Instance: `https://arcoconstruction.service-now.com`
@@ -63,11 +63,12 @@ window.SN = async (path, opts = {}) => {
   in-page to what you need before returning them: the extension caps results at about 50KB and string values at
   1000 characters.
 - **Write the HTTP method literally** (`method: 'PATCH'`) so the change is obvious to anyone reading it.
-- **Writes = resolve → preview → Matt's "yes" → re-check → write → verify → resync.** See `references/writing.md`.
-  For the preview, call **`mcp__arco__request_approval`** (title + markdown preview) so Matt gets an Approve / Reject
-  card in the chat, then **end your turn**. His answer comes back as his next message ("Yes, go ahead: …" or
-  "No, …"); a typed "yes" counts too. Use one "yes" per previewed batch. If anything changes after the preview,
-  preview it again.
+- **Writes = resolve → approval card → Matt's Approve → re-check → write → verify → resync.** See `references/writing.md`.
+  For the preview, **always call `mcp__arco__request_approval`** (title + markdown preview), which puts an
+  Approve / Reject card in Matt's Approvals panel, then **end your turn**. Don't ask "yes or no?" in text. When he
+  clicks Approve, his next message is "Yes, go ahead: …", and only that turn can write: the app's guard blocks
+  writes anywhere else, including after a typed "yes". If he rejects, or anything changes, prepare a new preview.
+  One card can cover a batch.
 - **Always finish a write by re-running the matching snapshot** from `references/reading.md`: the board after a
   story change, the timesheet after an hours change. That's how the app's local copy updates. The app won't let the
   turn end without it.
