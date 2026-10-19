@@ -21,6 +21,8 @@ Project rules for every Claude session in this repo: the orchestrator, workers, 
 ## Developing the app
 - TypeScript everywhere: `server/` (Fastify, msnodesqlv8 → SQL Server LocalDB) and `web/` (React + Vite).
 - `npm run dev` starts both. `npm run typecheck` before committing.
+- After changing `server/hooks/sn-write-guard.mjs` or any `servicenow` skill recipe, run `npm run test:guard`: every recipe's
+  write snippet must pass the guard's rules, and the forbidden writes must stay blocked.
 - DB schema changes: append new idempotent statements to `server/src/db/schema.ts`. Never edit applied ones.
 - Claude runs go through `server/src/claude/runner.ts` (headless `claude -p`, stream-json). Don't add the Agent
   SDK or an API key: Chrome integration requires the claude.ai login.

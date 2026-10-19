@@ -106,13 +106,16 @@ for (const body of PAYLOADS) {
     method: 'POST',
     body: JSON.stringify(body),
   });
-  created.push({ number: r.number, sys_id: r.sys_id.replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-'), title: r.short_description, state: r.state });
+  created.push({ number: r.number, sys_id: r.sys_id.replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-'), title: r.short_description, lane: r.state });
 }
 created;
 ```
 
+Name the read-back field `lane`, not `state`: the write guard only accepts `state:` with a literal value in a write
+snippet, so it can check the lane you're setting.
+
 ## 5. Verify and resync
 
-- Check that each returned state is the one you intended. Reply with each new number linked to
+- Check that each returned lane is the one you intended. Reply with each new number linked to
   `https://arcoconstruction.service-now.com/rm_story.do?sys_id=<sys_id without dashes>`.
 - Run the story snapshot from reading.md for each new story, then the board snapshot. If Matt then wants to work one of them, suggest its story chat.
