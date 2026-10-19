@@ -107,6 +107,10 @@ export function createItem(workspaceId: string, p: { displayName: string; type: 
   });
 }
 
+export function renameItem(workspaceId: string, itemId: string, displayName: string) {
+  return fabric<Item>(`/workspaces/${workspaceId}/items/${itemId}`, { method: 'PATCH', body: { displayName } });
+}
+
 export async function updateDefinition(workspaceId: string, itemId: string, parts: DefinitionPart[], format?: string): Promise<void> {
   await fabric(`/workspaces/${workspaceId}/items/${itemId}/updateDefinition`, {
     method: 'POST',

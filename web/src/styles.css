@@ -299,3 +299,9 @@ pre.note {
 .msg.app .msg-body { background: transparent; border-style: dashed; color: var(--muted); padding: 6px 10px; }
 .msg.app .msg-body strong { color: var(--text); }
 .select-full { width: 100%; margin: 4px 0 6px; }
+.publish-summary { margin: 6px 0; padding-left: 18px; }
+.time-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 6px 0; }
+.time-day { display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); min-width: 0; }
+.time-day.today { border-color: var(--accent); }
+.time-day .input { margin: 0; padding: 4px 6px; width: 100%; min-width: 0; }
+@media (max-width: 640px) { .time-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }

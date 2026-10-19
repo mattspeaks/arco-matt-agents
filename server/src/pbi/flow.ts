@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { config } from '../config.js';
 import { query, queryOne } from '../db/index.js';
@@ -9,9 +10,10 @@ import { publish } from '../bus.js';
 import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
 import { createRun, getRun, parseMeta, type Run } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
-import { createItem, getDefinition, listItems, listWorkspaces, updateDefinition, type Workspace } from '../fabric/client.js';
+import { askTimeEntry } from '../timesheet.js';
+import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
-import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
+import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
 
 // The Power BI story workflow (ARCHITECTURE.md §5). One workflow per story, and it doesn't have to run in a straight
 // line: it can start from Fabric or from the repo, take over a branch built outside it, rebuild, stop, or raise a
@@ -112,7 +114,21 @@ export async function publishTargets(storyNumber?: string) {
   const flow = storyNumber ? await getFlow(storyNumber) : undefined;
   const list = (await workspaces()).map((w) => ({ id: w.id, name: w.displayName.trim(), blocked: isBlocked(w.displayName) }));
   list.sort((a, b) => a.name.localeCompare(b.name));
-  return { workspaces: list, suggested: flow ? suggestTarget(flow.data, list) : undefined };
+  return { workspaces: list, suggested: flow ? suggestTarget(flow.data, list) : undefined, repoName: flow?.data.reportName };
+}
+
+/**
+ * For the Publish card, once a workspace is picked: its reports, and which one this story's report should update.
+ * The story's own report (by id) wins; otherwise a report with the same name; otherwise none (create new).
+ */
+export async function publishOptions(storyNumber: string, workspaceId: string) {
+  const flow = await getFlow(storyNumber);
+  if (!flow) throw new Error(`No report workflow for ${storyNumber}`);
+  const items = await listItems(workspaceId, 'Report');
+  const reports = items.map((i) => ({ id: i.id, name: i.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+  const byId = flow.data.reportId && reports.find((r) => r.id === flow.data.reportId);
+  const byName = reports.find((r) => r.name.toLowerCase() === flow.data.reportName.toLowerCase());
+  return { reports, match: (byId || byName || undefined)?.id ?? '', repoName: flow.data.reportName };
 }
 
 /** "<workspace> Acceptance Region" when it exists, else the workspace itself (the source, or the repo folder's). */
@@ -338,8 +354,11 @@ export async function attachReportWork(p: { parentRunId?: string | null; branch:
     conversationId: conv.id,
     plan: p.plan ?? existing?.data.plan ?? '(Work built outside the workflow, then attached.)',
     source: 'attached',
-    sourceWorkspaceId: home?.id ?? existing?.data.sourceWorkspaceId,
-    sourceWorkspaceName: home?.displayName.trim() ?? existing?.data.sourceWorkspaceName,
+    // The story's original Fabric report stays the publish target; the repo folder's workspace is only a fallback.
+    sourceWorkspaceId: existing?.data.sourceWorkspaceId ?? home?.id,
+    sourceWorkspaceName: existing?.data.sourceWorkspaceName ?? home?.displayName.trim(),
+    reportId: existing?.data.reportId,
+    modelId: existing?.data.modelId,
     reportName: local.reportName,
     modelName: local.modelName,
     branch,
@@ -351,8 +370,7 @@ export async function attachReportWork(p: { parentRunId?: string | null; branch:
     baseSha: base,
     round: (existing?.data.round ?? 0) + 1,
     revisions: existing?.data.revisions ?? [],
-    lastBuilder: existing?.data.lastBuilder,
-    lastQc: existing?.data.lastQc,
+    // Results from earlier runs describe other commits; the attached branch hasn't been built or QC'd here yet.
   };
   await saveFlow(storyNumber, 'idle', data);
   await supersedeFlowCards(storyNumber);
@@ -468,7 +486,15 @@ async function raiseReviewCard(story: string, d: FlowData, qc?: { verdict?: stri
 type CardPayload = Record<string, string> & { conversationId: string; storyNumber: string };
 
 /** Called by approvals.decide before the card is marked. Throwing leaves the card pending. Returns the outcome text. */
-export async function decideFlowCard(approval: Approval, approve: boolean, note?: string, extra: { workspaceId?: string } = {}): Promise<string> {
+export interface PublishChoice {
+  workspaceId?: string;
+  /** Existing report to update; empty = create a new one. */
+  reportId?: string;
+  /** Name for the report in Fabric and in the repo. */
+  name?: string;
+}
+
+export async function decideFlowCard(approval: Approval, approve: boolean, note?: string, extra: PublishChoice = {}): Promise<string> {
   const p = JSON.parse(approval.payload) as CardPayload;
   const story = p.storyNumber;
   const withNote = note ? ` (${note})` : '';
@@ -562,9 +588,17 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     const ws = (await workspaces()).find((w) => w.id === extra.workspaceId);
     if (!ws) throw new Error("That workspace isn't one you can access");
     if (isBlocked(ws.displayName)) throw new Error(`${ws.displayName.trim()} is a TEST/PROD workspace; agents never publish there`);
+    const name = (extra.name ?? flow.data.reportName).trim();
+    if (!name || name.length > 200 || /[<>:"/\\|?*]/.test(name)) throw new Error('The report name must be 1–200 characters, without < > : " / \\ | ? *');
+    let target: { id: string; name: string } | undefined;
+    if (extra.reportId) {
+      const found = (await listItems(ws.id, 'Report')).find((i) => i.id === extra.reportId);
+      if (!found) throw new Error(`That report isn't in ${ws.displayName.trim()} any more`);
+      target = { id: found.id, name: found.displayName };
+    }
     await saveFlow(story, 'publishing', flow.data);
-    void pipeline(story, approval.id, () => publishFlow(story, ws, approval.id));
-    return `Publishing to ${ws.displayName.trim()}…`;
+    void pipeline(story, approval.id, () => publishFlow(story, ws, approval.id, { target, name }));
+    return `Publishing to ${ws.displayName.trim()} as "${name}"…`;
   }
 
   throw new Error(`Not a workflow card: ${approval.kind}`);
@@ -774,25 +808,46 @@ export async function openForReview(story: string, approvalId?: string): Promise
   return { opened: pbip, laneMove: 'requested' };
 }
 
-async function publishFlow(story: string, ws: Workspace, approvalId: string) {
-  const { data } = (await getFlow(story))!;
-  const wt = data.worktree!;
+/** Which items a publish touched, for the chat note. */
+interface Touched {
+  report: string;
+  model?: string;
+}
+
+async function publishFlow(story: string, ws: Workspace, approvalId: string, choice: { target?: { id: string; name: string }; name: string }) {
+  const before = (await getFlow(story))!.data;
+  const wt = before.worktree!;
   const wsName = ws.displayName.trim();
   // Anything Matt saved in Desktop during review goes in too.
   await commitAll(wt, `${story}: changes saved in Power BI Desktop during review`);
+  // The name on the card becomes the name in the repo too, so git and Fabric match.
+  const modelFollows = !!before.modelName && before.modelName === before.reportName;
+  const data = await renameInRepo(story, before, choice.name);
+  if (data !== before) await saveFlow(story, 'publishing', data);
 
   const targetItems = await listItems(ws.id);
   let modelId = data.modelId;
   let modelCreated: boolean | undefined;
+  const touched: Touched = { report: '' };
   if (data.modelDir && data.modelName) {
     const parts = readParts(join(wt, data.modelDir));
-    const existing = targetItems.find((i) => i.type === 'SemanticModel' && i.displayName === data.modelName);
+    // Updating an existing report: update the model it's bound to (if that model is in this workspace).
+    let bound: string | undefined;
+    if (choice.target) {
+      const pbirText = partText(await getDefinition(ws.id, choice.target.id), 'definition.pbir');
+      const ref = pbirText ? parseModelRef(pbirText) : {};
+      bound = targetItems.find((i) => i.type === 'SemanticModel' && i.id === ref.modelId)?.id;
+    }
+    const existing = bound ? targetItems.find((i) => i.id === bound) : targetItems.find((i) => i.type === 'SemanticModel' && i.displayName === data.modelName);
     if (existing) {
       await updateDefinition(ws.id, existing.id, parts, 'TMDL');
       modelId = existing.id;
+      if (modelFollows && existing.displayName !== data.modelName) await renameItem(ws.id, existing.id, data.modelName);
+      touched.model = `updated model "${existing.displayName}"${modelFollows && existing.displayName !== data.modelName ? ` (renamed to "${data.modelName}")` : ''}`;
     } else {
       modelId = (await createItem(ws.id, { displayName: data.modelName, type: 'SemanticModel', parts, format: 'TMDL' })).id;
       modelCreated = true;
+      touched.model = `created model "${data.modelName}"`;
     }
   }
 
@@ -802,13 +857,16 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string) {
   if (JSON.parse(pbir)?.datasetReference?.byPath) throw new Error("The report points at a model folder the app couldn't find, so it can't be published");
   const parts = [...readParts(reportDir).filter((x) => x.path !== 'definition.pbir'), textPart('definition.pbir', pbir)];
   const format = parts.some((x) => x.path === 'report.json') ? 'PBIR-Legacy' : 'PBIR';
-  const existingReport = targetItems.find((i) => i.type === 'Report' && i.displayName === data.reportName);
+  const existingReport = choice.target;
   let reportId: string;
   if (existingReport) {
     await updateDefinition(ws.id, existingReport.id, parts, format);
+    if (existingReport.name !== data.reportName) await renameItem(ws.id, existingReport.id, data.reportName);
     reportId = existingReport.id;
+    touched.report = `updated report "${existingReport.name}"${existingReport.name !== data.reportName ? ` (renamed to "${data.reportName}")` : ''}`;
   } else {
     reportId = (await createItem(ws.id, { displayName: data.reportName, type: 'Report', parts, format })).id;
+    touched.report = `created report "${data.reportName}"`;
   }
   const reportUrl = `https://app.powerbi.com/groups/${ws.id}/reports/${reportId}`;
   const published = { workspaceId: ws.id, workspaceName: wsName, reportUrl, modelCreated, reportCreated: !existingReport };
@@ -838,9 +896,88 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string) {
   await postAppNote(
     data.conversationId,
     [
-      `**Published** *${data.reportName}* to **${wsName}** (${existingReport ? 'updated the existing report' : 'new report'}${data.modelName ? `; model ${modelCreated ? 'created' : 'updated'}` : ''}): [open in Power BI](${reportUrl})`,
+      `**Published** to **${wsName}**: ${[touched.report, touched.model].filter(Boolean).join('; ')}. [Open in Power BI](${reportUrl})`,
+      data.reportName !== before.reportName && `Renamed in the repo too: \`${before.reportDir}\` → \`${data.reportDir}\`.`,
       prUrl ? `**Pull request:** [${prUrl.split('/').pop()}](${prUrl}). Merging it is yours.` : `**PR not opened:** ${prError}`,
       `Still yours: ${[data.modelName && (modelCreated ? "set the new model's data source credentials and refresh it" : 'refresh the model if its schema changed'), 'merge the PR', 'update the app'].filter(Boolean).join(', ')}.`,
-    ].join('\n\n'),
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
   );
+  // Last step: how much time to log for the story (a failure here mustn't look like a failed publish).
+  await askTimeEntry(data.conversationId, story).catch((err) => postAppNote(data.conversationId, `Couldn't put up the Timesheet card: ${err instanceof Error ? err.message : err}`));
+}
+
+/** Sets an item folder's .platform display name (creating .platform if the folder has none). */
+function setDisplayName(dirAbs: string, type: 'Report' | 'SemanticModel', name: string) {
+  const path = join(dirAbs, '.platform');
+  const json = existsSync(path)
+    ? JSON.parse(readFileSync(path, 'utf8'))
+    : {
+        $schema: 'https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json',
+        metadata: { type },
+        config: { version: '2.0', logicalId: randomUUID() },
+      };
+  json.metadata = { ...json.metadata, displayName: name };
+  writeFileSync(path, JSON.stringify(json, null, 2) + '\n');
+}
+
+/** git mv that also works for a case-only rename on Windows (via a temporary name). */
+async function gitMove(wt: string, from: string, to: string) {
+  if (from === to) return;
+  if (from.toLowerCase() === to.toLowerCase()) {
+    const tmp = `${from}.renaming`;
+    await git(wt, ['mv', from, tmp]);
+    await git(wt, ['mv', tmp, to]);
+  } else {
+    if (existsSync(join(wt, to))) throw new Error(`Can't rename to ${to}: it already exists in the repo`);
+    await git(wt, ['mv', from, to]);
+  }
+}
+
+/**
+ * Renames the report in the repo: .platform display name, X.Report folder and X.pbip (and the model, when it had the
+ * report's name). The parent folder stays. Commits the rename and returns the updated flow data.
+ */
+export async function renameInRepo(story: string, d: FlowData, name: string): Promise<FlowData> {
+  const oldName = d.reportName;
+  if (name === oldName) return d;
+  const wt = d.worktree!;
+  const posixRel = (p: string) => p.replace(/\\/g, '/');
+  const safe = safeName(name);
+  const reportRel = d.reportDir!;
+  const parentRel = posix.dirname(reportRel);
+  const newReportRel = posix.join(parentRel, `${safe}.Report`);
+  let newModelRel = d.modelDir;
+  let modelName = d.modelName;
+
+  setDisplayName(join(wt, reportRel), 'Report', name);
+  if (d.modelDir && d.modelName === oldName) {
+    setDisplayName(join(wt, d.modelDir), 'SemanticModel', name);
+    newModelRel = posix.join(posix.dirname(d.modelDir), `${safe}.SemanticModel`);
+    await gitMove(wt, d.modelDir, newModelRel);
+    modelName = name;
+  }
+  await gitMove(wt, reportRel, newReportRel);
+  // The report's local model path and the .pbip's report path follow the new folder names.
+  const pbirPath = join(wt, newReportRel, 'definition.pbir');
+  const pbir = JSON.parse(readFileSync(pbirPath, 'utf8'));
+  if (pbir?.datasetReference?.byPath && newModelRel) {
+    pbir.datasetReference.byPath.path = posixRel(relative(join(wt, newReportRel), join(wt, newModelRel)));
+    writeFileSync(pbirPath, JSON.stringify(pbir, null, 2) + '\n');
+  }
+  let newPbipRel = d.pbip;
+  if (d.pbip && existsSync(join(wt, d.pbip))) {
+    const pbip = JSON.parse(readFileSync(join(wt, d.pbip), 'utf8'));
+    for (const a of pbip.artifacts ?? []) if (a.report?.path === posix.basename(reportRel)) a.report.path = posix.basename(newReportRel);
+    writeFileSync(join(wt, d.pbip), JSON.stringify(pbip, null, 2) + '\n');
+    newPbipRel = posix.join(posix.dirname(d.pbip), `${safe}.pbip`);
+    await gitMove(wt, d.pbip, newPbipRel);
+  }
+  // Desktop's local files (.pbi/) aren't tracked, so git mv leaves them behind; move what's left.
+  for (const [from, to] of [[reportRel, newReportRel], [d.modelDir, newModelRel]] as const) {
+    if (from && to && from !== to && existsSync(join(wt, from, '.pbi')) && !existsSync(join(wt, to, '.pbi'))) renameSync(join(wt, from, '.pbi'), join(wt, to, '.pbi'));
+  }
+  await commitAll(wt, `${story}: rename report "${oldName}" to "${name}"`);
+  return { ...d, reportName: name, modelName, reportDir: newReportRel, modelDir: newModelRel, pbip: newPbipRel };
 }

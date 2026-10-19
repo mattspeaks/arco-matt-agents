@@ -9,10 +9,11 @@ import { startWorkerRun } from './workers.js';
 // (and anyone reading the conversation) sees his "yes" or "no" right where the change happens.
 // pbi_*: the Power BI story workflow's cards (pbi/flow.ts). pbi_start, pbi_review and pbi_revise also authorise the
 // lane move and acceptance-criteria update they describe, in the chat turn the click starts.
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish';
+// time_entry: hours to add to a story's timesheet row, entered on the card (timesheet.ts).
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'time_entry';
 
 /** Cards whose click starts a chat turn that may write to ServiceNow (see /api/agent/write_permit). */
-export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise'];
+export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise', 'time_entry'];
 const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish'];
 
 export interface Approval {
@@ -77,10 +78,24 @@ export async function setOutcome(id: string, outcome: string) {
 }
 
 /** Matt's decision. Approval executes the action; nothing in the agent layer can call this. */
-export async function decide(id: string, approve: boolean, note?: string, extra: { workspaceId?: string } = {}): Promise<Approval> {
+export async function decide(
+  id: string,
+  approve: boolean,
+  note?: string,
+  extra: { workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number> } = {},
+): Promise<Approval> {
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');
   if (approval.status !== 'pending') throw new Error(`Approval already ${approval.status}`);
+
+  if (approval.kind === 'time_entry') {
+    const { decideTimeEntry } = await import('./timesheet.js');
+    const outcome = await decideTimeEntry(approval, approve, extra.hours);
+    await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [approve ? 'approved' : 'rejected', note, outcome, id]);
+    const updated = (await getApproval(id))!;
+    publish('approval', updated);
+    return updated;
+  }
 
   if (FLOW_KINDS.includes(approval.kind)) {
     // The flow acts first (and may throw, e.g. the chat is busy); only then is the card marked.

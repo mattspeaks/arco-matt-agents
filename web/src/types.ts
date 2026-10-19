@@ -83,7 +83,7 @@ export interface RunEvent {
 
 export interface Approval {
   id: string;
-  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish';
+  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'time_entry';
   title: string;
   payload: string;
   status: 'pending' | 'approved' | 'rejected' | 'superseded';

@@ -186,6 +186,16 @@ server.registerTool(
 );
 
 server.registerTool(
+  'ask_time_entry',
+  {
+    description:
+      "Puts a Timesheet card in the chat: this week's days, each with a box for hours to add to a story, next to what's already logged. Matt fills it in; his Add click starts a turn that asks you to add the hours (servicenow skill, timesheet recipe). Use it when he wants to log time on a story, instead of asking for numbers in text. In a story chat the story is implied.",
+    inputSchema: { story_number: z.string().optional() },
+  },
+  (args) => call('ask_time_entry', args),
+);
+
+server.registerTool(
   'stop_report_work',
   {
     description: "Story chats only. Stops the story's running builder/QC loop (e.g. Matt says wait, or something's wrong). The branch keeps what was committed. No card needed.",

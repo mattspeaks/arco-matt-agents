@@ -271,9 +271,10 @@ Everything happens in the **story chat**. Cards appear in that chat and in Appro
 | 7 | **Open** launches the `.pbip` in Power BI Desktop. The first open in each round starts a chat turn that moves the story | **Matt** clicks; orchestrator | → **Ready for testing** + work note |
 | 8a | **Not ready**: the story moves back, then the orchestrator interviews Matt until the change list is complete. It calls `submit_revision`, which puts up a **revision card** (the changes + the acceptance-criteria text) | **Matt** answers and approves | → **WIP**, acceptance criteria appended |
 | 8b | Revision approved: back to step 5 (round n+1), then step 6 | App | |
-| 9 | **Approve** → **Publish card**: a workspace dropdown. It suggests "<source> Acceptance Region" if it exists, else the source workspace. TEST/PROD/UAT workspaces are listed but can't be picked | **Matt** picks and confirms | |
-| 10 | Publish the model (update by name, or create), then the report, re-pointed (`byConnection`) at that model. Push the branch, open the Azure DevOps PR | App | stays in Ready for testing |
-| 11 | Merge the PR, set credentials/refresh a new model, update the app | **Matt** | Testing onward is Matt's |
+| 9 | **Approve** → **Publish card** with three fields. **Workspace:** every workspace you can access, with one marked *suggested* (the story's own source workspace, or its "Acceptance Region" sibling); TEST/PROD/UAT ones are listed but can't be picked. **Report:** update an existing report in that workspace (matched by item id: the story's own report is pre-selected), or create a new one. **Name:** editable; the report gets this name in Fabric *and* in the repo (folder, .pbip, display name, renamed with git mv before the PR) | **Matt** picks and confirms | |
+| 10 | Rename in the repo if the name changed. Publish the model (the one the chosen report is bound to, or one with the model's name, or a new one), then the report, re-pointed (`byConnection`) at that model; renamed in Fabric if needed. Push the branch, open the Azure DevOps PR | App | stays in Ready for testing |
+| 11 | **Timesheet card**: this week's days, each with a box for hours to add (what's already logged on the story is shown). **Add** starts a chat turn that adds them | **Matt** fills it in | time_card hours |
+| 12 | Merge the PR, set credentials/refresh a new model, update the app | **Matt** | Testing onward is Matt's |
 
 Each ServiceNow move happens in a turn started by one of Matt's own clicks (Approve or Open), and only the turn
 that click starts can write: `write_permit` checks the card. The app never touches ServiceNow itself, and nothing

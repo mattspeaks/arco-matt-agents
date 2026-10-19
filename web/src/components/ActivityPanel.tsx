@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
-import { PublishCard, ReviewCard } from './FlowCards';
+import { PublishCard, ReviewCard, TimeEntryCard } from './FlowCards';
 
 const KIND_LABEL: Record<Run['kind'], string> = { sync: 'Sync', orchestrator: 'Chat', worker: 'Worker', sn_write: 'SN write' };
 
@@ -106,6 +106,7 @@ const KIND_TITLE: Partial<Record<Approval['kind'], string>> = {
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   if (approval.kind === 'pbi_review') return <ReviewCard approval={approval} onError={onError} />;
   if (approval.kind === 'pbi_publish') return <PublishCard approval={approval} onError={onError} />;
+  if (approval.kind === 'time_entry') return <TimeEntryCard approval={approval} onError={onError} />;
   return <BasicApprovalCard approval={approval} onError={onError} />;
 }
 

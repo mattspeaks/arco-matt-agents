@@ -5,12 +5,13 @@ import { config } from './config.js';
 import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
 import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
-import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishTargets, recoverInterruptedFlows, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
+import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
 import { createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getStory, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
+import { askTimeEntry } from './timesheet.js';
 
 await initDb();
 await recoverInterruptedRuns();
@@ -75,8 +76,10 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string } }>('/api/approvals/:id/decision', async (req) =>
-  decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId }),
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number> } }>(
+  '/api/approvals/:id/decision',
+  async (req) =>
+    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours }),
 );
 
 // ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------
@@ -91,6 +94,8 @@ app.post<{ Params: { number: string }; Body: { approvalId?: string } }>('/api/fl
 app.post<{ Params: { number: string } }>('/api/flows/:number/stop', async (req) => stopReportWork({ storyNumber: req.params.number, reason: 'stopped from the app' }));
 // The Publish card's dropdown.
 app.get<{ Querystring: { story?: string } }>('/api/fabric/workspaces', async (req) => publishTargets(req.query.story));
+// The Publish card's report picker for the chosen workspace (and which report the story's report should update).
+app.get<{ Params: { id: string }; Querystring: { story: string } }>('/api/fabric/workspaces/:id/reports', async (req) => publishOptions(req.query.story, req.params.id));
 
 app.get('/api/workers', async () => listWorkers());
 
@@ -233,6 +238,13 @@ app.post<{ Body: AgentBody }>('/api/agent/attach_report_work', async (req) => {
   return agentCall(() => attachReportWork({ parentRunId: req.body.parentRunId, branch, repoReport: str(req.body.repo_report), plan: str(req.body.plan) }));
 });
 app.post<{ Body: AgentBody }>('/api/agent/request_review', async (req) => agentCall(() => requestReview({ parentRunId: req.body.parentRunId, summary: str(req.body.summary) })));
+app.post<{ Body: AgentBody }>('/api/agent/ask_time_entry', async (req) => {
+  const run = req.body.parentRunId ? await getRun(req.body.parentRunId) : undefined;
+  const conv = run?.conversation_id ? await getConversation(run.conversation_id) : undefined;
+  const story = str(req.body.story_number) ?? conv?.story_number ?? undefined;
+  if (!conv || !story) throw bad('ask_time_entry needs a story (story_number, or use it in a story chat)');
+  return agentCall(() => askTimeEntry(conv.id, story));
+});
 app.post<{ Body: AgentBody }>('/api/agent/stop_report_work', async (req) => agentCall(() => stopReportWork({ parentRunId: req.body.parentRunId, reason: str(req.body.reason) })));
 
 // Localhost only: this API can drive your browser session and start agents.
