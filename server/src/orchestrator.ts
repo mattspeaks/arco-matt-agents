@@ -99,11 +99,14 @@ async function addMessage(conversationId: string, role: 'user' | 'assistant' | '
 // The Power BI report workflow (pbi/flow.ts). The app pulls, runs the loop and publishes; the orchestrator plans,
 // talks to Matt and makes the ServiceNow moves his card clicks authorise.
 const REPORT_WORKFLOW = `### Power BI report work in this chat
-When the story is about changing an existing Power BI report:
-1. Find the report: \`list_fabric_items\` (no args lists workspaces, a workspace lists its reports and models). Agree the
-   plan with Matt.
-2. Call \`propose_report_work\` with the workspace, the report, the plan, and the Work in progress work note. Then end
-   your turn. The start card covers the whole run.
+All Power BI report work for this story goes through the app's report workflow. That's what produces the Review and
+Publish cards. You can't start pbi-builder on the PowerBI repo yourself (start_worker refuses), and you never work in
+Matt's own checkout. The workflow doesn't have to be linear: use the tools below to change course at any point.
+1. Find the report: \`list_repo_reports\` (the repo on main) and/or \`list_fabric_items\` (workspaces → reports). Agree the
+   plan with Matt. Prefer starting from the repo (\`repo_report\`) when the report is already there and main is current.
+   Start from Fabric when the service copy is the truth. If it's in the repo under another name, pass both.
+2. Call \`propose_report_work\` with the source, the plan, and the Work in progress work note, then end your turn.
+   The start card covers the whole run.
 3. When Matt approves, his message asks you to move the story to Work in progress. Do that (servicenow skill), resync,
    and end the turn. Don't wait for the app: it pulls the report and runs builder ⇄ QC itself, posting notes here.
 4. A Review report card follows. When Matt opens it, his message asks you to move the story to Ready for testing
@@ -114,8 +117,16 @@ When the story is about changing an existing Power BI report:
    criteria (append; keep what's there) and resync.
 6. Approve on the Review card leads to a Publish card where Matt picks the workspace. The app publishes and opens
    the PR. Never merge it, and never publish or update an app.
-\`get_report_flow\` shows where the workflow is. Don't start pbi-builder or pbi-qc yourself for a report that's in this
-workflow: the app runs them.`;
+
+Changing course:
+- Matt says wait, or something's wrong mid-build: \`stop_report_work\`. Then fix the plan with him and \`submit_revision\`
+  (rebuild on the same branch), or \`propose_report_work\` again to start over (from Fabric or the repo).
+- Work exists on a branch the workflow doesn't own (Matt built it, or an earlier detour): \`attach_report_work\`, then
+  \`request_review\` or \`submit_revision\`.
+- Whenever a report is ready for Matt to look at and no Review card is pending: \`request_review\`. Never leave him
+  with a finished build and no Review card.
+- Something the workflow can't do: tell Matt before doing anything else, rather than working around it.
+\`get_report_flow\` shows where the workflow is.`;
 
 function systemPrompt(conv: Conversation): string {
   const base = readFileSync(resolve(REPO_ROOT, 'prompts/orchestrator.md'), 'utf8');

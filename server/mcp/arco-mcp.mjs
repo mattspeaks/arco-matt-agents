@@ -128,10 +128,11 @@ server.registerTool(
   'propose_report_work',
   {
     description:
-      "Story chats only. Puts the start card for changing an existing Power BI report in Matt's Approvals: the plan, the pull from Fabric into the PowerBI repo, the move to Work in progress, the builder/QC loop, and the Review card. END YOUR TURN after calling it.",
+      "Story chats only. Puts the start card for report work in Matt's Approvals: the plan, the branch, the move to Work in progress, the builder/QC loop, then the Review card. Start from Fabric (workspace + report: pulled into the repo first) or from the repo as it is on main (repo_report only). If the report already exists in the repo under a different name, pass repo_report along with workspace + report so the pull lands in that folder. Replaces any earlier workflow for the story. END YOUR TURN after calling it.",
     inputSchema: {
-      workspace: z.string().describe('Workspace id or name the report lives in'),
-      report: z.string().describe('Report id or name'),
+      workspace: z.string().optional().describe('Fabric source: workspace id or name the report lives in'),
+      report: z.string().optional().describe('Fabric source: report id or name'),
+      repo_report: z.string().optional().describe('Repo path (from list_repo_reports) of the X.Report folder or .pbip, e.g. "Accounting/ARandAP to GL Report/APARtoGLReportv2.pbip"'),
       plan: z.string().describe('Markdown: what will change and how, the builder brief in Matt-readable form'),
       work_note: z.string().describe('The exact Work in progress work note, in the standard [Agent: Power BI Manager] format'),
     },
@@ -143,13 +144,54 @@ server.registerTool(
   'submit_revision',
   {
     description:
-      'Story chats only, after Matt clicks Not ready and you have interviewed him. Puts the revision card in his Approvals: the changes, the text to append to the acceptance criteria, then another builder/QC loop. END YOUR TURN after calling it.',
+      "Story chats only. Puts a rebuild card in Matt's Approvals: the changes, optionally text to append to the acceptance criteria, then another builder/QC loop on the same branch and a new Review card. Use it after Not ready (once you've interviewed him), after a stop or failure, or whenever he wants more changes. END YOUR TURN after calling it.",
     inputSchema: {
       changes: z.string().describe('Markdown: the complete, numbered list of changes, specific enough for the builder'),
-      acceptance_criteria: z.string().describe('Text to append to the story acceptance criteria, exactly as it will be written'),
+      acceptance_criteria: z.string().optional().describe('Text to append to the story acceptance criteria, exactly as it will be written'),
     },
   },
   (args) => call('submit_revision', args),
+);
+
+server.registerTool(
+  'list_repo_reports',
+  {
+    description: 'PowerBI repo, read-only, as it is on main: the reports (X.Report folders) under a folder, with their display names. Use it to find repo_report.',
+    inputSchema: { folder: z.string().optional().describe('e.g. "Accounting"; omit for the whole repo') },
+  },
+  (args) => call('list_repo_reports', args),
+);
+
+server.registerTool(
+  'attach_report_work',
+  {
+    description:
+      "Story chats only. Takes over a branch of the PowerBI repo that was built outside the workflow (by Matt, or in an earlier detour), so the Review and Publish cards work for it. No card: it sets up the app's own worktree on that branch. If the branch is checked out in Matt's own checkout, he has to switch that away first (tell him). Then call request_review or submit_revision.",
+    inputSchema: {
+      branch: z.string().describe('e.g. agent/STRY0024370-apar-gl-disclaimer-banner'),
+      repo_report: z.string().optional().describe('The X.Report folder or .pbip, if the branch changes more than one report'),
+      plan: z.string().optional().describe("What the branch does, if the story's workflow doesn't already have a plan"),
+    },
+  },
+  (args) => call('attach_report_work', args),
+);
+
+server.registerTool(
+  'request_review',
+  {
+    description: "Story chats only. Puts a Review report card up now for the story's branch as it is (Open in Desktop, then Approve → Publish card, or Not ready). Use it whenever a report is ready for Matt to look at and no Review card is pending. END YOUR TURN after calling it.",
+    inputSchema: { summary: z.string().optional().describe("What changed, for the card and the Ready for testing work note, if the last builder run's summary isn't right any more") },
+  },
+  (args) => call('request_review', args),
+);
+
+server.registerTool(
+  'stop_report_work',
+  {
+    description: "Story chats only. Stops the story's running builder/QC loop (e.g. Matt says wait, or something's wrong). The branch keeps what was committed. No card needed.",
+    inputSchema: { reason: z.string().optional() },
+  },
+  (args) => call('stop_report_work', args),
 );
 
 server.registerTool('get_report_flow', { description: "Story chats only. Where this story's Power BI report workflow is: stage, branch, paths, last builder/QC results, PR." }, () =>

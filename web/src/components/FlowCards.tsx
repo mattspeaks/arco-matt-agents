@@ -42,7 +42,7 @@ export function ReviewCard({ approval, onError }: { approval: Approval; onError:
   const open = async () => {
     setOpening(true);
     try {
-      const r = await api<{ laneMove: 'requested' | 'already' | 'chat_busy' }>(`/api/flows/${p.storyNumber}/open`, { body: {} });
+      const r = await api<{ laneMove: 'requested' | 'already' | 'chat_busy' }>(`/api/flows/${p.storyNumber}/open`, { body: { approvalId: approval.id } });
       setOpened(true);
       setInfo(
         r.laneMove === 'requested'
@@ -65,7 +65,7 @@ export function ReviewCard({ approval, onError }: { approval: Approval; onError:
       <dl className="kv small">
         <dt>QC</dt>
         <dd>
-          <span className={`tag ${p.qcVerdict === 'PASS' ? 'pass' : 'fail'}`}>{p.qcVerdict}</span>
+          <span className={`tag ${p.qcVerdict === 'PASS' ? 'pass' : p.qcVerdict === 'FAIL' ? 'fail' : 'subtle'}`}>{p.qcVerdict}</span>
         </dd>
         <dt>Branch</dt>
         <dd className="mono ellipsis">{p.branch}</dd>

@@ -279,8 +279,27 @@ Each ServiceNow move happens in a turn started by one of Matt's own clicks (Appr
 that click starts can write: `write_permit` checks the card. The app never touches ServiceNow itself, and nothing
 in the flow starts a chat turn on its own. Its progress notes are plain chat messages.
 
+### 5.3 When work isn't linear
+One workflow per story. It owns the story's branch, and it can change course at any point (flow.ts):
+- **Start from the repo or from Fabric.**  takes  (build on main as it is) or a
+  workspace + report (pull first). A pull lands in the existing repo folder: the one the orchestrator names, or one
+  whose  display name matches. A new folder is made only when neither exists.
+- **Take over outside work.**  puts a branch built outside the workflow into the app's worktree.
+  If Matt has that branch checked out, he switches his checkout away first; agents never work in his checkout.
+- **Review card on demand.**  raises one for the branch as it is, so a finished build always ends in one.
+- **Rebuild from any stage.**  works after Not ready, a stop, a failure or publishing. The
+  acceptance-criteria text is optional.
+- **Stop.**  cancels the running worker, and the branch keeps what was committed. Publishing
+  can't be stopped halfway.
+- **Builds can't go around it.**  refuses  on the PowerBI repo, so every build runs in
+  the workflow and ends in a Review card.
+- **Cards follow the branch.** A new build, attach or review supersedes older pending Review and Publish cards. The
+  Review card authorises its own lane moves: Open → Ready for testing, Not ready → WIP.
+- **QC gets the diff from the app,** as  and the list of changed files. The base is the
+  untouched pull commit, or the point where the branch left main.
+
 If the server restarts in the middle of a step, the flow is marked failed. The orchestrator can rerun it with a
-revision card.
+rebuild card.
 
 ---
 

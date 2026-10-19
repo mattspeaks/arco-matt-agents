@@ -31,21 +31,73 @@ export const slugify = (s: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 40) || 'report';
 
-/** The story's worktree, created from origin/<base> on first use. Returns its path. */
-export async function ensureWorktree(branch: string, storyNumber: string): Promise<string> {
-  const dir = resolve(config.powerbi.worktreeRoot, storyNumber);
-  if (existsSync(resolve(dir, '.git'))) return dir;
-  mkdirSync(resolve(config.powerbi.worktreeRoot), { recursive: true });
-  const repo = repoPath();
-  const base = await baseBranch();
-  await git(repo, ['fetch', 'origin', base]);
-  const exists = await git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).then(
+const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase();
+const branchExists = (branch: string) =>
+  git(repoPath(), ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).then(
     () => true,
     () => false,
   );
-  await git(repo, exists ? ['worktree', 'add', dir, branch] : ['worktree', 'add', '-b', branch, dir, `origin/${base}`]);
+
+/** Where a branch is checked out (any worktree, including Matt's own checkout), if anywhere. */
+async function checkedOutAt(branch: string): Promise<string | undefined> {
+  const out = await git(repoPath(), ['worktree', 'list', '--porcelain']);
+  for (const block of out.split(/\n\n+/)) {
+    const path = /^worktree (.+)$/m.exec(block)?.[1];
+    if (path && new RegExp(`^branch refs/heads/${branch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'm').test(block)) return path;
+  }
+  return undefined;
+}
+
+/**
+ * The branch's own worktree under worktreeRoot (one per branch), created on first use: from `from` (default
+ * origin/<base>) for a new branch, or on the existing branch. A branch that's checked out in Matt's own checkout
+ * can't get a second worktree; he switches his checkout away first, so agents never work in it.
+ */
+export async function ensureWorktree(branch: string, from?: string): Promise<string> {
+  const root = resolve(config.powerbi.worktreeRoot);
+  const at = await checkedOutAt(branch);
+  if (at) {
+    if (norm(at).startsWith(norm(root) + '/')) return resolve(at);
+    throw new Error(
+      `${branch} is checked out in ${at}. Agents don't work in your own checkout: switch it to another branch (e.g. \`git switch main\`) and try again; the app then works on ${branch} in its own worktree.`,
+    );
+  }
+  const dir = resolve(root, branch.replace(/^agent\//, '').replace(/[^\w.-]+/g, '-'));
+  if (existsSync(dir)) throw new Error(`${dir} already exists but isn't a worktree of ${branch}; remove it and try again`);
+  mkdirSync(root, { recursive: true });
+  const repo = repoPath();
+  const base = await baseBranch();
+  await git(repo, ['fetch', 'origin', base]);
+  if (await branchExists(branch)) await git(repo, ['worktree', 'add', dir, branch]);
+  else await git(repo, ['worktree', 'add', '-b', branch, dir, from ?? `origin/${base}`]);
   return dir;
 }
+
+/** Fetches and returns the ref new work branches from (origin/<base>). */
+export async function freshBase(): Promise<string> {
+  const base = await baseBranch();
+  await git(repoPath(), ['fetch', 'origin', base]);
+  return `origin/${base}`;
+}
+
+export async function refExists(ref: string): Promise<boolean> {
+  return git(repoPath(), ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]).then(
+    () => true,
+    () => false,
+  );
+}
+
+/** Files under a folder at a ref (repo-relative, forward slashes), without checking anything out. */
+export async function filesAt(ref: string, folder: string): Promise<string[]> {
+  const out = await git(repoPath(), ['ls-tree', '-r', '--name-only', ref, '--', folder.replace(/\/$/, '') + '/']);
+  return out ? out.split('\n') : [];
+}
+
+export const showAt = (ref: string, path: string) => git(repoPath(), ['show', `${ref}:${path}`]);
+
+export const mergeBase = (dir: string, ref: string) => git(dir, ['merge-base', 'HEAD', ref]);
+
+export const diffStat = (dir: string, since: string) => git(dir, ['diff', '--stat', since, 'HEAD']);
 
 /** Commits everything in the worktree. Returns the new commit sha, or undefined if there was nothing to commit. */
 export async function commitAll(dir: string, message: string): Promise<string | undefined> {

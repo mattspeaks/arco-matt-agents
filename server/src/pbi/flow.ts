@@ -1,45 +1,55 @@
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { basename, dirname, join, posix, relative, resolve } from 'node:path';
 import { config } from '../config.js';
 import { query, queryOne } from '../db/index.js';
-import { createApproval, setOutcome, supersedeChatApprovals, type Approval } from '../approvals.js';
+import { createApproval, getApproval, setOutcome, supersedeChatApprovals, type Approval } from '../approvals.js';
+import { cancelClaudeRun } from '../claude/runner.js';
+import { publish } from '../bus.js';
 import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
 import { createRun, getRun, parseMeta, type Run } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { createItem, getDefinition, listItems, listWorkspaces, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
-import { changedFiles, commitAll, ensureWorktree, headSha, openPullRequest, pushBranch, slugify } from './repo.js';
+import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
 
-// The Power BI story workflow (ARCHITECTURE.md §5): start card → pull from Fabric into the PowerBI repo →
-// builder ⇄ QC loop → Review report card → (Not ready → interview → revision card → loop again) or
-// (Approve → Publish card → Fabric publish + PR). Every ServiceNow change happens in the story chat, in a turn
-// started by one of Matt's clicks; the app itself never touches ServiceNow.
+// The Power BI story workflow (ARCHITECTURE.md §5). One workflow per story, and it doesn't have to run in a straight
+// line: it can start from Fabric or from the repo, take over a branch built outside it, rebuild, stop, or raise a
+// Review card at any point. Builders only run here (start_worker refuses pbi-builder on the PowerBI repo), so a build
+// always ends in a Review card, and Approve on that card always leads to the Publish card.
+// ServiceNow changes happen only in story-chat turns started by Matt's clicks; the app never touches ServiceNow.
 
-export type Stage = 'pulling' | 'building' | 'review' | 'revising' | 'publishing' | 'published' | 'failed';
+export type Stage = 'pulling' | 'building' | 'idle' | 'review' | 'revising' | 'publishing' | 'published' | 'failed';
 const ACTIVE: Stage[] = ['pulling', 'building', 'publishing'];
 
 export interface FlowData {
   conversationId: string;
   plan: string;
-  /** The approved card that authorises the next lane move (start card, then the latest revision card). */
-  permitApprovalId: string;
-  sourceWorkspaceId: string;
-  sourceWorkspaceName: string;
-  reportId: string;
+  /** fabric: pulled from a workspace; repo: built from the PowerBI repo; attached: a branch built outside the workflow. */
+  source?: 'fabric' | 'repo' | 'attached';
+  /** The approved card that authorises the WIP move (start card, then the latest rebuild card). */
+  permitApprovalId?: string;
+  sourceWorkspaceId?: string;
+  sourceWorkspaceName?: string;
+  reportId?: string;
   reportName: string;
   modelId?: string;
   modelName?: string;
   thinReportNote?: string;
   branch: string;
   folder: string;
+  /** Report folder in the repo (repo-relative), when known before the worktree exists. */
+  repoReport?: string;
   worktree?: string;
   reportDir?: string; // relative to the worktree
   modelDir?: string;
   pbip?: string;
-  pullSha?: string;
+  /** What QC diffs against: the untouched pull commit, or where the branch left main. */
+  baseSha?: string;
+  pullSha?: string; // older flows
   round: number;
   revisions: string[];
+  activeRunId?: string;
   lastBuilder?: string;
   lastQc?: { verdict?: string; result: string };
   movedToReadyRound?: number;
@@ -74,9 +84,11 @@ export async function recoverInterruptedFlows() {
   const rows = await query<FlowRow>(`SELECT * FROM dbo.story_flows WHERE stage IN ('pulling', 'building', 'publishing')`);
   for (const row of rows) {
     const data = JSON.parse(row.data) as FlowData;
-    await saveFlow(row.story_number, 'failed', { ...data, error: `Interrupted while ${row.stage}: server restarted` });
+    await saveFlow(row.story_number, 'failed', { ...data, activeRunId: undefined, error: `Interrupted while ${row.stage}: server restarted` });
   }
 }
+
+const diffBase = (d: FlowData) => d.baseSha ?? d.pullSha;
 
 // ---- workspaces ---------------------------------------------------------------------------------
 
@@ -103,11 +115,11 @@ export async function publishTargets(storyNumber?: string) {
   return { workspaces: list, suggested: flow ? suggestTarget(flow.data, list) : undefined };
 }
 
-/** Prefer "<source> Acceptance Region" when it exists, else the workspace the report came from. */
+/** "<workspace> Acceptance Region" when it exists, else the workspace itself (the source, or the repo folder's). */
 function suggestTarget(flow: FlowData, list: { id: string; name: string; blocked: boolean }[]) {
-  const source = flow.sourceWorkspaceName.trim();
-  const acceptance = list.find((w) => !w.blocked && w.name.toLowerCase() === `${source} acceptance region`.toLowerCase());
-  return acceptance?.id ?? list.find((w) => w.id === flow.sourceWorkspaceId && !w.blocked)?.id;
+  const home = (flow.sourceWorkspaceName ?? flow.folder).trim().toLowerCase();
+  const pick = (name: string) => list.find((w) => !w.blocked && w.name.toLowerCase() === name)?.id;
+  return pick(`${home} acceptance region`) ?? (flow.sourceWorkspaceId && list.find((w) => w.id === flow.sourceWorkspaceId && !w.blocked)?.id) ?? pick(home);
 }
 
 /** Repo folder for a workspace: configured override, else the name minus an "Acceptance (Region)" suffix. */
@@ -117,6 +129,87 @@ function workspaceFolder(name: string): string {
 }
 
 const safeName = (s: string) => s.replace(/[<>:"/\\|?*]/g, '_').trim();
+const displayNameOf = (platformJson: string | undefined, folder: string, type: string) => {
+  try {
+    const name = JSON.parse(platformJson ?? '')?.metadata?.displayName;
+    if (name) return String(name);
+  } catch {
+    /* no .platform */
+  }
+  return basename(folder).replace(new RegExp(`\\.${type}$`), '');
+};
+
+// ---- the repo, read at a ref (no checkout needed) ------------------------------------------------
+
+const cleanRepoPath = (p: string) => p.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '').replace(/^PowerBI\//i, '');
+
+/** Accepts a .pbip, an X.Report folder, or a folder holding exactly one report. Returns the X.Report folder. */
+export async function resolveRepoReport(ref: string, input: string): Promise<{ reportDir: string; name: string }> {
+  const path = cleanRepoPath(input);
+  let reportDir: string | undefined;
+  if (/\.pbip$/i.test(path)) {
+    const pbip = JSON.parse(await showAt(ref, path).catch(() => '{}'));
+    const rel = pbip?.artifacts?.find((a: { report?: { path?: string } }) => a.report?.path)?.report.path;
+    if (!rel) throw new Error(`${path} isn't a .pbip on ${ref}`);
+    reportDir = posix.normalize(posix.join(posix.dirname(path), rel));
+  } else if (/\.Report$/i.test(path)) {
+    reportDir = path;
+  } else {
+    const dirs = [...new Set((await filesAt(ref, path)).filter((f) => f.endsWith('.Report/definition.pbir')).map((f) => posix.dirname(f)))];
+    if (dirs.length !== 1) throw new Error(dirs.length ? `${path} holds several reports; pass one of: ${dirs.join(', ')}` : `No report under ${path} on ${ref}`);
+    reportDir = dirs[0];
+  }
+  const files = await filesAt(ref, reportDir);
+  if (!files.includes(`${reportDir}/definition.pbir`)) throw new Error(`No report at ${reportDir} on ${ref}`);
+  const platform = files.includes(`${reportDir}/.platform`) ? await showAt(ref, `${reportDir}/.platform`) : undefined;
+  return { reportDir, name: displayNameOf(platform, reportDir, 'Report') };
+}
+
+/** An existing report in a repo folder with this display name (or the same name ignoring spaces/punctuation). */
+export async function findRepoReport(ref: string, folder: string, name: string): Promise<string | undefined> {
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const reports = [...new Set((await filesAt(ref, folder)).filter((f) => f.endsWith('.Report/definition.pbir')).map((f) => posix.dirname(f)))];
+  for (const dir of reports) {
+    const platform = await showAt(ref, `${dir}/.platform`).catch(() => undefined);
+    if (key(displayNameOf(platform, dir, 'Report')) === key(name)) return dir;
+  }
+  return undefined;
+}
+
+export async function listRepoReports(folder?: string) {
+  const ref = await freshBase();
+  const files = await filesAt(ref, folder ? cleanRepoPath(folder) : '.');
+  const dirs = [...new Set(files.filter((f) => f.endsWith('.Report/definition.pbir')).map((f) => posix.dirname(f)))];
+  const reports = [];
+  for (const dir of dirs) {
+    const platform = await showAt(ref, `${dir}/.platform`).catch(() => undefined);
+    reports.push({ report_folder: dir, name: displayNameOf(platform, dir, 'Report') });
+  }
+  return { ref, reports };
+}
+
+/** Fills in names and paths from the report folder in the worktree (its .platform, its pbir's model path, the .pbip). */
+function describeLocal(wt: string, reportDirAbs: string, createPbip: boolean) {
+  const read = (p: string) => (existsSync(p) ? readFileSync(p, 'utf8') : undefined);
+  const reportName = displayNameOf(read(join(reportDirAbs, '.platform')), reportDirAbs, 'Report');
+  let modelDirAbs: string | undefined;
+  try {
+    const byPath = JSON.parse(read(join(reportDirAbs, 'definition.pbir')) ?? '{}')?.datasetReference?.byPath?.path;
+    if (byPath && existsSync(resolve(reportDirAbs, byPath))) modelDirAbs = resolve(reportDirAbs, byPath);
+  } catch {
+    /* unreadable pbir */
+  }
+  const modelName = modelDirAbs ? displayNameOf(read(join(modelDirAbs, '.platform')), modelDirAbs, 'SemanticModel') : undefined;
+  const parent = dirname(reportDirAbs);
+  const folderName = basename(reportDirAbs);
+  const existingPbip = readdirSync(parent)
+    .filter((f) => f.toLowerCase().endsWith('.pbip'))
+    .find((f) => (read(join(parent, f)) ?? '').includes(`"${folderName}"`));
+  const pbipAbs = join(parent, existingPbip ?? `${folderName.replace(/\.Report$/, '')}.pbip`);
+  if (!existingPbip && createPbip) writePbip(pbipAbs, folderName);
+  const r = (p: string) => relative(wt, p).replace(/\\/g, '/');
+  return { reportName, modelName, reportDir: r(reportDirAbs), modelDir: modelDirAbs && r(modelDirAbs), pbip: r(pbipAbs) };
+}
 
 // ---- orchestrator tools -------------------------------------------------------------------------
 
@@ -138,56 +231,193 @@ export async function listFabric(workspace?: string) {
   };
 }
 
-/** Puts the combined start card in Approvals: plan + pull + move to WIP + loop + Ready for testing on review. */
-export async function proposeReportWork(p: { parentRunId?: string | null; workspace: string; report: string; plan: string; workNote: string }) {
+function assertNotActive(story: string, flow?: { stage: Stage }) {
+  if (flow && ACTIVE.includes(flow.stage)) throw new Error(`${story}'s workflow is ${flow.stage} right now. Wait for it, or stop it with stop_report_work.`);
+}
+
+/**
+ * The start card. From Fabric (workspace + report: pull into the repo first) or from the repo (repo_report: build on
+ * main as it is). Either way: move to WIP, builder ⇄ QC, Review card. Replaces any earlier workflow for the story.
+ */
+export async function proposeReportWork(p: {
+  parentRunId?: string | null;
+  workspace?: string;
+  report?: string;
+  repoReport?: string;
+  plan: string;
+  workNote: string;
+}) {
   const { run, conv, storyNumber } = await storyChat(p.parentRunId);
   const existing = await getFlow(storyNumber);
-  if (existing && ACTIVE.includes(existing.stage)) throw new Error(`${storyNumber} already has work in progress (${existing.stage}). Use get_report_flow.`);
-  const ws = await findWorkspace(p.workspace);
-  const report = (await listItems(ws.id, 'Report')).find((i) => i.id === p.report || i.displayName.toLowerCase() === p.report.trim().toLowerCase());
-  if (!report) throw new Error(`No report "${p.report}" in workspace ${ws.displayName}`);
-  const branch = `agent/${storyNumber}-${slugify(report.displayName)}`;
-  const folder = workspaceFolder(ws.displayName);
+  assertNotActive(storyNumber, existing);
+  const ref = await freshBase();
+  let payload: Record<string, string>;
+  let sourceLine: string;
+  let firstStep: string;
+
+  if (p.workspace && p.report) {
+    const ws = await findWorkspace(p.workspace);
+    const report = (await listItems(ws.id, 'Report')).find((i) => i.id === p.report || i.displayName.toLowerCase() === p.report!.trim().toLowerCase());
+    if (!report) throw new Error(`No report "${p.report}" in workspace ${ws.displayName}`);
+    const folder = workspaceFolder(ws.displayName);
+    const repoReport = p.repoReport ? (await resolveRepoReport(ref, p.repoReport)).reportDir : await findRepoReport(ref, folder, report.displayName);
+    payload = { source: 'fabric', workspaceId: ws.id, workspaceName: ws.displayName.trim(), reportId: report.id, reportName: report.displayName, folder, repoReport: repoReport ?? '' };
+    sourceLine = `**Source:** report *${report.displayName}* in workspace *${ws.displayName.trim()}* (plus its semantic model if it's in the same workspace), pulled into ${
+      repoReport ? `the existing \`PowerBI/${repoReport}\`` : `a new folder \`PowerBI/${folder}/${safeName(report.displayName)}/\` (no report with that name is in \`${folder}/\` on ${ref}; pass repo_report if it lives under another name)`
+    }.`;
+    firstStep = 'The app pulls the report from Fabric into the repo and commits it untouched, so the diff shows only the changes.';
+  } else if (p.repoReport) {
+    const found = await resolveRepoReport(ref, p.repoReport);
+    const folder = found.reportDir.split('/')[0];
+    const home = (await workspaces()).find((w) => w.displayName.trim().toLowerCase() === folder.toLowerCase());
+    payload = { source: 'repo', reportName: found.name, folder, repoReport: found.reportDir, workspaceId: home?.id ?? '', workspaceName: home?.displayName.trim() ?? '' };
+    sourceLine = `**Source:** \`PowerBI/${found.reportDir}\` (*${found.name}*) as it is on ${ref}. Nothing is pulled from Fabric.`;
+    firstStep = `The app branches from ${ref}.`;
+  } else {
+    throw new Error('Give either workspace + report (start from Fabric) or repo_report (start from the repo)');
+  }
+
+  const branch = `agent/${storyNumber}-${slugify(payload.reportName)}`;
   const preview = [
     `**Plan**\n\n${p.plan}`,
-    `**Source:** report *${report.displayName}* in workspace *${ws.displayName.trim()}*, plus its semantic model if it lives in the same workspace.`,
-    `**Repo:** \`PowerBI/${folder}/…\` on branch \`${branch}\`, in a separate worktree, so your own checkout isn't touched.`,
+    sourceLine,
+    `**Branch:** \`${branch}\`, in the app's own worktree. Your checkout isn't touched.`,
+    existing && `**Replaces** the earlier workflow for ${storyNumber} (\`${existing.data.branch}\`, ${existing.stage}). That branch is left as it is.`,
     `**What happens when you approve**`,
-    `1. The app pulls the report from Fabric into the repo and commits it untouched.`,
+    `1. ${firstStep}`,
     `2. ServiceNow: ${storyNumber} → **Work in progress**, with this work note:\n\n\`\`\`\n${p.workNote}\n\`\`\``,
-    `3. Power BI builder ⇄ QC: build → QC → build → QC → build → final QC. It stops early as soon as QC passes.`,
-    `4. A **Review report** card appears in this chat. Opening the report from it moves ${storyNumber} → **Ready for testing**, with a work note giving the build and QC results.`,
-  ].join('\n\n');
+    `3. Power BI builder ⇄ QC: build → QC → build → QC → build → final QC. It stops as soon as QC passes.`,
+    `4. A **Review report** card appears in this chat. Opening the report from it moves ${storyNumber} → **Ready for testing**.`,
+  ]
+    .filter(Boolean)
+    .join('\n\n');
   await supersedeChatApprovals(conv.id);
   const approval = await createApproval({
     kind: 'pbi_start',
-    title: `${storyNumber}: start work on "${report.displayName}"`,
-    payload: { conversationId: conv.id, storyNumber, preview, workspaceId: ws.id, workspaceName: ws.displayName.trim(), reportId: report.id, reportName: report.displayName, plan: p.plan, branch, folder },
+    title: `${storyNumber}: start work on "${payload.reportName}"`,
+    payload: { conversationId: conv.id, storyNumber, preview, plan: p.plan, branch, ...payload },
     requestedByRunId: run.id,
   });
   await postApprovalCard(conv.id, approval.id);
-  return { approval_id: approval.id, status: 'pending', note: 'The start card is in Matt\'s Approvals panel and in this chat. End your turn now.' };
+  return { approval_id: approval.id, status: 'pending', note: "The start card is in Matt's Approvals panel and in this chat. End your turn now." };
 }
 
-/** After "Not ready" and the interview: the revision card (acceptance criteria update + another loop). */
-export async function submitRevision(p: { parentRunId?: string | null; changes: string; acceptanceCriteria: string }) {
+/**
+ * Takes over a branch built outside the workflow (by hand, in Desktop, or an earlier detour), so the Review and
+ * Publish cards work for it. No card: it only sets up the app's worktree on that branch. The chat then raises a
+ * Review card (request_review) or a rebuild card (submit_revision).
+ */
+export async function attachReportWork(p: { parentRunId?: string | null; branch: string; repoReport?: string; plan?: string }) {
+  const { conv, storyNumber } = await storyChat(p.parentRunId);
+  const existing = await getFlow(storyNumber);
+  assertNotActive(storyNumber, existing);
+  const ref = await freshBase();
+  const branch = p.branch.replace(/^refs\/heads\//, '').replace(/^origin\//, '');
+  if (!(await refExists(branch)) && !(await refExists(`origin/${branch}`))) throw new Error(`No branch ${branch} in the PowerBI repo`);
+  const wt = await ensureWorktree(branch, (await refExists(branch)) ? undefined : `origin/${branch}`);
+  const base = await mergeBase(wt, ref);
+
+  let reportRel = p.repoReport ? cleanRepoPath(p.repoReport) : undefined;
+  if (reportRel && /\.pbip$/i.test(reportRel)) {
+    const pbip = JSON.parse(readFileSync(join(wt, reportRel), 'utf8'));
+    reportRel = posix.normalize(posix.join(posix.dirname(reportRel), pbip.artifacts.find((a: { report?: { path?: string } }) => a.report?.path).report.path));
+  }
+  if (!reportRel) {
+    const dirs = [...new Set((await changedFiles(wt, base)).map((f) => /^(.*?\.Report)\//.exec(f)?.[1]).filter((d): d is string => !!d))];
+    if (dirs.length !== 1) throw new Error(dirs.length ? `The branch changes several reports; pass repo_report: ${dirs.join(', ')}` : `The branch changes no report; pass repo_report`);
+    reportRel = dirs[0];
+  }
+  const reportAbs = resolve(wt, reportRel);
+  if (!existsSync(join(reportAbs, 'definition.pbir'))) throw new Error(`No report at ${reportRel} on ${branch}`);
+  const local = describeLocal(wt, reportAbs, true);
+  await commitAll(wt, `${storyNumber}: add .pbip for ${local.reportName}`);
+  const folder = local.reportDir.split('/')[0];
+  const home = (await workspaces()).find((w) => w.displayName.trim().toLowerCase() === folder.toLowerCase());
+
+  const data: FlowData = {
+    conversationId: conv.id,
+    plan: p.plan ?? existing?.data.plan ?? '(Work built outside the workflow, then attached.)',
+    source: 'attached',
+    sourceWorkspaceId: home?.id ?? existing?.data.sourceWorkspaceId,
+    sourceWorkspaceName: home?.displayName.trim() ?? existing?.data.sourceWorkspaceName,
+    reportName: local.reportName,
+    modelName: local.modelName,
+    branch,
+    folder,
+    worktree: wt,
+    reportDir: local.reportDir,
+    modelDir: local.modelDir,
+    pbip: local.pbip,
+    baseSha: base,
+    round: (existing?.data.round ?? 0) + 1,
+    revisions: existing?.data.revisions ?? [],
+    lastBuilder: existing?.data.lastBuilder,
+    lastQc: existing?.data.lastQc,
+  };
+  await saveFlow(storyNumber, 'idle', data);
+  await supersedeFlowCards(storyNumber);
+  const files = await changedFiles(wt, base);
+  await postAppNote(conv.id, `Attached \`${branch}\` to ${storyNumber}'s workflow: *${local.reportName}* at \`PowerBI/${local.reportDir}\`, ${files.length} files changed since ${ref}. It now runs in the app's worktree.`);
+  return {
+    stage: 'idle',
+    branch,
+    report: local.reportDir,
+    files_changed: files.length,
+    next: 'Call request_review to put the Review card up for this branch as it is, or submit_revision to rebuild (builder ⇄ QC) first.',
+  };
+}
+
+/** Puts a Review card up for the branch as it is now, from any stage that isn't mid-step. */
+export async function requestReview(p: { parentRunId?: string | null; summary?: string }) {
+  const { storyNumber } = await storyChat(p.parentRunId);
+  const flow = await getFlow(storyNumber);
+  if (!flow?.data.worktree) throw new Error(`${storyNumber} has no report branch in the workflow yet (propose_report_work or attach_report_work first)`);
+  assertNotActive(storyNumber, flow);
+  await commitAll(flow.data.worktree, `${storyNumber}: changes left uncommitted before review`);
+  const data = { ...flow.data, lastBuilder: p.summary ?? flow.data.lastBuilder };
+  await saveFlow(storyNumber, 'review', data);
+  await raiseReviewCard(storyNumber, data, flow.data.lastQc);
+  return { status: 'review card posted', note: "The Review card is in this chat and Matt's Approvals. End your turn." };
+}
+
+/**
+ * A rebuild card: more builder ⇄ QC on the same branch, with Matt's changes. Works from any stage that isn't
+ * mid-step (after Not ready, after a stop or failure, after publishing). The acceptance-criteria text is optional.
+ */
+export async function submitRevision(p: { parentRunId?: string | null; changes: string; acceptanceCriteria?: string }) {
   const { run, conv, storyNumber } = await storyChat(p.parentRunId);
   const flow = await getFlow(storyNumber);
-  if (!flow || !['review', 'revising', 'failed'].includes(flow.stage)) throw new Error(`No report waiting on changes for ${storyNumber} (stage: ${flow?.stage ?? 'none'})`);
+  if (!flow) throw new Error(`${storyNumber} has no report workflow yet (propose_report_work or attach_report_work first)`);
+  assertNotActive(storyNumber, flow);
   const preview = [
     `**Changes to make**\n\n${p.changes}`,
-    `**ServiceNow:** add to ${storyNumber}'s acceptance criteria:\n\n\`\`\`\n${p.acceptanceCriteria}\n\`\`\``,
-    `**What happens when you approve:** the builder ⇄ QC loop runs again (round ${flow.data.round + 1}), then a new **Review report** card appears. Opening the report from it moves ${storyNumber} → **Ready for testing**.`,
+    p.acceptanceCriteria
+      ? `**ServiceNow:** ${storyNumber} → Work in progress (if it isn't already), and add to its acceptance criteria:\n\n\`\`\`\n${p.acceptanceCriteria}\n\`\`\``
+      : `**ServiceNow:** ${storyNumber} → Work in progress, if it isn't already.`,
+    `**What happens when you approve:** builder ⇄ QC on \`${flow.data.branch}\` (round ${flow.data.round + 1})${flow.data.worktree ? '' : ', after pulling the report'}, then a new **Review report** card. Opening the report from it moves ${storyNumber} → **Ready for testing**.`,
   ].join('\n\n');
   await supersedeChatApprovals(conv.id);
   const approval = await createApproval({
     kind: 'pbi_revise',
-    title: `${storyNumber}: revise "${flow.data.reportName}" (round ${flow.data.round + 1})`,
-    payload: { conversationId: conv.id, storyNumber, preview, changes: p.changes, acceptanceCriteria: p.acceptanceCriteria },
+    title: `${storyNumber}: rebuild "${flow.data.reportName}" (round ${flow.data.round + 1})`,
+    payload: { conversationId: conv.id, storyNumber, preview, changes: p.changes, acceptanceCriteria: p.acceptanceCriteria ?? '' },
     requestedByRunId: run.id,
   });
   await postApprovalCard(conv.id, approval.id);
-  return { approval_id: approval.id, status: 'pending', note: 'The revision card is in Matt\'s Approvals panel and in this chat. End your turn now.' };
+  return { approval_id: approval.id, status: 'pending', note: "The rebuild card is in Matt's Approvals panel and in this chat. End your turn now." };
+}
+
+/** Stops a running builder ⇄ QC loop; the branch keeps whatever was committed. No card: stopping is always safe. */
+export async function stopReportWork(p: { parentRunId?: string | null; storyNumber?: string; reason?: string }) {
+  const storyNumber = p.storyNumber ?? (await storyChat(p.parentRunId)).storyNumber;
+  const flow = await getFlow(storyNumber);
+  if (!flow) throw new Error(`${storyNumber} has no report workflow`);
+  if (flow.stage === 'publishing') throw new Error('Publishing is under way and stopping it halfway would leave Fabric half-updated; let it finish');
+  if (flow.stage !== 'building' && flow.stage !== 'pulling') return { stage: flow.stage, note: 'Nothing is running.' };
+  await saveFlow(storyNumber, 'idle', { ...flow.data, activeRunId: undefined });
+  if (flow.data.activeRunId) cancelClaudeRun(flow.data.activeRunId);
+  await postAppNote(flow.data.conversationId, `Stopped the builder ⇄ QC loop${p.reason ? `: ${p.reason}` : ''}. \`${flow.data.branch}\` keeps what was committed. Rebuild, review or start over from here.`);
+  return { stage: 'idle', note: 'Stopped. Next: submit_revision to rebuild, request_review to review as it is, or propose_report_work to start over.' };
 }
 
 export async function flowSummary(parentRunId?: string | null) {
@@ -198,7 +428,42 @@ export async function flowSummary(parentRunId?: string | null) {
   return { story: storyNumber, stage: flow.stage, ...rest, lastBuilder: lastBuilder?.slice(0, 2000), lastQc: lastQc && { ...lastQc, result: lastQc.result.slice(0, 3000) } };
 }
 
-// ---- Matt's decisions on flow cards ---------------------------------------------------------------
+// ---- cards --------------------------------------------------------------------------------------
+
+/** Older Review/Publish cards for the story stop being actionable once the branch moves on. */
+async function supersedeFlowCards(storyNumber: string) {
+  const rows = await query<{ id: string }>(
+    `SELECT id FROM dbo.approvals WHERE kind IN ('pbi_review', 'pbi_publish') AND status = 'pending' AND JSON_VALUE(payload, '$.storyNumber') = ?`,
+    [storyNumber],
+  );
+  for (const { id } of rows) {
+    await query(`UPDATE dbo.approvals SET status = 'superseded', outcome = 'Replaced: the branch moved on', decided_at = SYSUTCDATETIME() WHERE id = ?`, [id]);
+    publish('approval', await getApproval(id));
+  }
+}
+
+async function raiseReviewCard(story: string, d: FlowData, qc?: { verdict?: string; result: string }) {
+  await supersedeFlowCards(story);
+  const base = diffBase(d);
+  const changed = base && d.worktree ? await changedFiles(d.worktree, base) : [];
+  const builder = d.lastBuilder ?? '';
+  const card = await createApproval({
+    kind: 'pbi_review',
+    title: `${story}: review "${d.reportName}"${d.round > 1 ? ` (round ${d.round})` : ''}`,
+    payload: {
+      conversationId: d.conversationId,
+      storyNumber: story,
+      round: String(d.round),
+      qcVerdict: qc?.verdict ?? 'not run',
+      summary: (/Summary:\s*([\s\S]*?)(?:\n[A-Z][\w /]+:|$)/.exec(builder)?.[1] ?? builder).trim().slice(0, 1500),
+      files: String(changed.length),
+      branch: d.branch,
+      pbip: d.pbip ?? '',
+    },
+    requestedByRunId: null,
+  });
+  await postApprovalCard(d.conversationId, card.id);
+}
 
 type CardPayload = Record<string, string> & { conversationId: string; storyNumber: string };
 
@@ -213,30 +478,34 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       await sendMessage(p.conversationId, `No, don't start: ${approval.title}.${note ? ` ${note}` : ''}`);
       return 'Rejected in chat';
     }
+    assertNotActive(story, await getFlow(story));
     await sendMessage(
       p.conversationId,
-      `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress now with the work note from the card, then resync. The app is pulling the report and running the builder/QC loop, and posts progress here.`,
+      `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress now with the work note from the card, then resync. The app is setting up the branch and running the builder/QC loop, and posts progress here.`,
       { answersApprovalId: approval.id },
     );
     const data: FlowData = {
       conversationId: p.conversationId,
       plan: p.plan,
+      source: p.source === 'repo' ? 'repo' : 'fabric',
       permitApprovalId: approval.id,
-      sourceWorkspaceId: p.workspaceId,
-      sourceWorkspaceName: p.workspaceName,
-      reportId: p.reportId,
+      sourceWorkspaceId: p.workspaceId || undefined,
+      sourceWorkspaceName: p.workspaceName || undefined,
+      reportId: p.reportId || undefined,
       reportName: p.reportName,
       branch: p.branch,
       folder: p.folder,
+      repoReport: p.repoReport || undefined,
       round: 1,
       revisions: [],
     };
+    await supersedeFlowCards(story);
     await saveFlow(story, 'pulling', data);
     void pipeline(story, approval.id, async () => {
-      await pull(story);
+      await prepare(story);
       await buildLoop(story);
     });
-    return 'Approved: pulling the report, then building';
+    return 'Approved: setting up the branch, then building';
   }
 
   const flow = await getFlow(story);
@@ -264,17 +533,22 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
 
   if (approval.kind === 'pbi_revise') {
     if (!approve) {
-      await sendMessage(p.conversationId, `No, don't rerun yet: ${approval.title}.${note ? ` ${note}` : ''}`);
+      await sendMessage(p.conversationId, `No, don't rebuild yet: ${approval.title}.${note ? ` ${note}` : ''}`);
       return 'Rejected in chat';
     }
+    assertNotActive(story, flow);
     await sendMessage(
       p.conversationId,
-      `Yes, go ahead: ${approval.title}${withNote}. Add the new acceptance criteria from the card to ${story} in ServiceNow, then resync. The app is re-running the builder/QC loop with these changes.`,
+      `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress if it isn't already${p.acceptanceCriteria ? ', add the new acceptance criteria from the card' : ''}, then resync. The app is running the builder/QC loop with these changes.`,
       { answersApprovalId: approval.id },
     );
     const data: FlowData = { ...flow.data, round: flow.data.round + 1, revisions: [...flow.data.revisions, p.changes], permitApprovalId: approval.id, error: undefined };
-    await saveFlow(story, 'building', data);
-    void pipeline(story, approval.id, () => buildLoop(story));
+    await supersedeFlowCards(story);
+    await saveFlow(story, data.worktree ? 'building' : 'pulling', data);
+    void pipeline(story, approval.id, async () => {
+      if (!data.worktree) await prepare(story);
+      await buildLoop(story);
+    });
     return 'Approved: rebuilding';
   }
 
@@ -284,6 +558,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       return 'Not published';
     }
     if (!extra.workspaceId) throw new Error('Pick a workspace to publish to');
+    assertNotActive(story, flow);
     const ws = (await workspaces()).find((w) => w.id === extra.workspaceId);
     if (!ws) throw new Error("That workspace isn't one you can access");
     if (isBlocked(ws.displayName)) throw new Error(`${ws.displayName.trim()} is a TEST/PROD workspace; agents never publish there`);
@@ -302,9 +577,9 @@ async function pipeline(story: string, approvalId: string, step: () => Promise<v
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const flow = await getFlow(story);
-    if (flow) {
-      await saveFlow(story, 'failed', { ...flow.data, error: message });
-      await postAppNote(flow.data.conversationId, `**Stopped:** ${message}\n\nAsk the orchestrator here to retry once it's sorted.`);
+    if (flow && flow.stage !== 'idle') {
+      await saveFlow(story, 'failed', { ...flow.data, activeRunId: undefined, error: message });
+      await postAppNote(flow.data.conversationId, `**Stopped:** ${message}\n\nAsk the orchestrator here to retry (a rebuild card) once it's sorted.`);
     }
     await setOutcome(approvalId, `Failed: ${message.slice(0, 300)}`).catch(() => undefined);
   }
@@ -312,66 +587,92 @@ async function pipeline(story: string, approvalId: string, step: () => Promise<v
 
 // ---- steps --------------------------------------------------------------------------------------
 
-async function pull(story: string) {
+/** Sets up the story branch: from the repo as it is, or by pulling the report from Fabric into it. */
+async function prepare(story: string) {
   const { data } = (await getFlow(story))!;
-  const wt = await ensureWorktree(data.branch, story);
-  const parts = await getDefinition(data.sourceWorkspaceId, data.reportId);
+  const wt = await ensureWorktree(data.branch);
+  if (data.source === 'repo') {
+    const reportAbs = resolve(wt, data.repoReport!);
+    if (!existsSync(join(reportAbs, 'definition.pbir'))) throw new Error(`No report at ${data.repoReport} on ${data.branch}`);
+    const local = describeLocal(wt, reportAbs, true);
+    await commitAll(wt, `${story}: add .pbip for ${local.reportName}`);
+    const next: FlowData = { ...data, worktree: wt, ...local, baseSha: await mergeBase(wt, await freshBase()) };
+    await saveFlow(story, 'building', next);
+    await postAppNote(data.conversationId, `Working on \`PowerBI/${local.reportDir}\` (*${local.reportName}*) on \`${data.branch}\`, branched from main. Starting the builder ⇄ QC loop.`);
+    return;
+  }
+  await pullFromFabric(story, wt);
+}
+
+async function pullFromFabric(story: string, wt: string) {
+  const { data } = (await getFlow(story))!;
+  const parts = await getDefinition(data.sourceWorkspaceId!, data.reportId!);
   const pbir = partText(parts, 'definition.pbir');
   if (!pbir) throw new Error('The report definition has no definition.pbir');
   const ref = parseModelRef(pbir);
-  const sourceModels = await listItems(data.sourceWorkspaceId, 'SemanticModel');
-  const model = ref.modelId ? sourceModels.find((m) => m.id === ref.modelId) : undefined;
+  const model = ref.modelId ? (await listItems(data.sourceWorkspaceId!, 'SemanticModel')).find((m) => m.id === ref.modelId) : undefined;
 
   const folderRoot = join(wt, data.folder);
-  const reportDir = findItemFolder(folderRoot, 'Report', data.reportName) ?? join(folderRoot, safeName(data.reportName), `${safeName(data.reportName)}.Report`);
+  const reportDir = data.repoReport
+    ? resolve(wt, data.repoReport)
+    : (findItemFolder(folderRoot, 'Report', data.reportName) ?? join(folderRoot, safeName(data.reportName), `${safeName(data.reportName)}.Report`));
   let modelDir: string | undefined;
   if (model) {
-    modelDir = findItemFolder(folderRoot, 'SemanticModel', model.displayName) ?? join(dirname(reportDir), `${safeName(model.displayName)}.SemanticModel`);
-    writeParts(modelDir, await getDefinition(data.sourceWorkspaceId, model.id, 'TMDL'));
+    // Keep the model where the repo's report already points, if it does.
+    const existing = existsSync(reportDir) ? describeLocal(wt, reportDir, false).modelDir : undefined;
+    modelDir = existing
+      ? resolve(wt, existing)
+      : (findItemFolder(folderRoot, 'SemanticModel', model.displayName) ?? join(dirname(reportDir), `${safeName(model.displayName)}.SemanticModel`));
+    writeParts(modelDir, await getDefinition(data.sourceWorkspaceId!, model.id, 'TMDL'));
   }
   // Locally the report points at the model folder next to it, so Desktop opens both; publish re-points it.
   const localPbir = modelDir ? pbirByPath(pbir, relative(reportDir, modelDir).replace(/\\/g, '/')) : pbir;
   writeParts(reportDir, [...parts.filter((x) => x.path !== 'definition.pbir'), textPart('definition.pbir', localPbir)]);
-  const pbip = join(dirname(reportDir), `${basename(reportDir).replace(/\.Report$/, '')}.pbip`);
-  writePbip(pbip, basename(reportDir));
+  const local = describeLocal(wt, reportDir, true);
 
   const sha = (await commitAll(wt, `${story}: pull "${data.reportName}" from ${data.sourceWorkspaceName} (unchanged)`)) ?? (await headSha(wt));
-  const r = (p: string) => relative(wt, p).replace(/\\/g, '/');
   const next: FlowData = {
     ...data,
     worktree: wt,
-    reportDir: r(reportDir),
-    modelDir: modelDir && r(modelDir),
+    reportDir: local.reportDir,
+    modelDir: local.modelDir,
+    pbip: local.pbip,
     modelId: model?.id,
     modelName: model?.displayName,
     thinReportNote: model ? undefined : `The report uses a semantic model outside ${data.sourceWorkspaceName}${ref.modelName ? ` ("${ref.modelName}"${ref.workspaceName ? ` in ${ref.workspaceName}` : ''})` : ''}; only the report was pulled.`,
-    pbip: r(pbip),
-    pullSha: sha,
+    baseSha: sha,
   };
   await saveFlow(story, 'building', next);
   await postAppNote(
     data.conversationId,
-    `Pulled *${data.reportName}*${model ? ` and its model *${model.displayName}*` : ''} from ${data.sourceWorkspaceName} into \`PowerBI/${r(dirname(reportDir))}\` on \`${data.branch}\` (commit ${sha.slice(0, 7)}).${next.thinReportNote ? `\n\n${next.thinReportNote}` : ''}\n\nStarting the builder ⇄ QC loop.`,
+    `Pulled *${data.reportName}*${model ? ` and its model *${model.displayName}*` : ''} from ${data.sourceWorkspaceName} into \`PowerBI/${local.reportDir}\` on \`${data.branch}\` (commit ${sha.slice(0, 7)}).${next.thinReportNote ? `\n\n${next.thinReportNote}` : ''}\n\nStarting the builder ⇄ QC loop.`,
   );
 }
 
-async function runWorker(worker: string, brief: string, story: string, projectPath: string): Promise<Run> {
+/** Runs a worker for the loop. Returns undefined if the loop was stopped meanwhile. */
+async function runWorker(worker: string, brief: string, story: string, projectPath: string): Promise<Run | undefined> {
   const run = await createRun({
     kind: 'worker',
     worker,
     storyNumber: story,
     title: `${worker} · ${story}: ${brief.split('\n')[0].slice(0, 100)}`,
-    meta: { brief, projectPath },
+    meta: { brief, projectPath, flow: true },
   });
+  const before = await getFlow(story);
+  if (before?.stage !== 'building') return undefined;
+  await saveFlow(story, 'building', { ...before.data, activeRunId: run.id });
   await startWorkerRun(run.id);
-  return (await getRun(run.id))!;
+  const after = await getFlow(story);
+  if (after?.stage !== 'building') return undefined; // stopped while it ran
+  await saveFlow(story, 'building', { ...after.data, activeRunId: undefined });
+  return getRun(run.id);
 }
 
 async function buildLoop(story: string) {
   const { data } = (await getFlow(story))!;
-  if (!data.worktree || !data.reportDir || !data.pullSha) throw new Error('The report was never pulled; start over with a new start card');
+  const base = diffBase(data);
+  if (!data.worktree || !data.reportDir || !base) throw new Error('The branch was never set up; start over with a new start card');
   const wt = data.worktree;
-  const roundStart = await headSha(wt);
   const label = data.round > 1 ? ` (round ${data.round})` : '';
   let findings: string | undefined;
   let builder = '';
@@ -380,12 +681,15 @@ async function buildLoop(story: string) {
   for (let pass = 1; pass <= 3; pass++) {
     await postAppNote(data.conversationId, `Builder pass ${pass}${label} started.`);
     const b = await runWorker('pbi-builder', builderBrief(story, data, pass, findings), story, wt);
+    if (!b) return;
     if (b.status !== 'succeeded') throw new Error(`Builder pass ${pass} ${b.status}${b.error ? `: ${b.error}` : ''}`);
     builder = b.result ?? '';
     await commitAll(wt, `${story}: builder pass ${pass} (changes the builder left uncommitted)`);
 
-    const files = await changedFiles(wt, data.pullSha);
-    const q = await runWorker('pbi-qc', qcBrief(story, data, pass, files, findings), story, wt);
+    const files = await changedFiles(wt, base);
+    const stat = await diffStat(wt, base);
+    const q = await runWorker('pbi-qc', qcBrief(story, data, pass, files, stat, findings), story, wt);
+    if (!q) return;
     if (q.status !== 'succeeded') throw new Error(`QC review ${pass} ${q.status}${q.error ? `: ${q.error}` : ''}`);
     qc = { verdict: parseMeta<{ verdict?: string }>(q).verdict, result: q.result ?? '' };
     const final = qc.verdict === 'PASS' || pass === 3;
@@ -394,37 +698,23 @@ async function buildLoop(story: string) {
     findings = qc.result;
   }
 
-  const changed = await changedFiles(wt, roundStart);
-  const next: FlowData = { ...(await getFlow(story))!.data, lastBuilder: builder, lastQc: qc };
+  const current = await getFlow(story);
+  if (current?.stage !== 'building') return;
+  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc };
   await saveFlow(story, 'review', next);
-  const card = await createApproval({
-    kind: 'pbi_review',
-    title: `${story}: review "${data.reportName}"${label}`,
-    payload: {
-      conversationId: data.conversationId,
-      storyNumber: story,
-      round: String(data.round),
-      qcVerdict: qc.verdict ?? 'none',
-      summary: (/Summary:\s*([\s\S]*?)(?:\n[A-Z][\w /]+:|$)/.exec(builder)?.[1] ?? builder).trim().slice(0, 1500),
-      files: String(changed.length),
-      branch: data.branch,
-      pbip: next.pbip ?? '',
-    },
-    requestedByRunId: null,
-  });
-  await postApprovalCard(data.conversationId, card.id);
+  await raiseReviewCard(story, next, qc);
 }
 
 function builderBrief(story: string, d: FlowData, pass: number, findings?: string): string {
   const wt = d.worktree!;
   return [
     pass === 1 && d.round === 1
-      ? `Story ${story}: implement the plan below on the pulled report.`
+      ? `Story ${story}: implement the plan below.`
       : pass === 1
-        ? `Story ${story}, round ${d.round}: Matt reviewed the report and asked for the changes under "Revisions". Make them.`
+        ? `Story ${story}, round ${d.round}: make the changes under "Revisions" (the latest round is the one to do now).`
         : `Story ${story}, pass ${pass}: fix QC's findings below. Change only what they require.`,
     `## Plan (approved by Matt)\n${d.plan}`,
-    d.revisions.length && `## Revisions Matt asked for after review (also added to the acceptance criteria)\n${d.revisions.map((r, i) => `### Round ${i + 2}\n${r}`).join('\n\n')}`,
+    d.revisions.length && `## Revisions Matt asked for\n${d.revisions.map((r, i) => `### Round ${i + 2}\n${r}`).join('\n\n')}`,
     findings && `## QC findings to fix\n${findings}`,
     [
       '## Where',
@@ -438,13 +728,13 @@ function builderBrief(story: string, d: FlowData, pass: number, findings?: strin
     .join('\n\n');
 }
 
-function qcBrief(story: string, d: FlowData, pass: number, files: string[], previous?: string): string {
+function qcBrief(story: string, d: FlowData, pass: number, files: string[], stat: string, previous?: string): string {
   const wt = d.worktree!;
   return [
     `Story ${story}: QC review ${pass}${pass === 3 ? ' (final confirmation)' : ''} of "${d.reportName}".`,
     `Target project: ${join(wt, dirname(d.reportDir!))} (report ${basename(d.reportDir!)}${d.modelDir ? `, model ${basename(d.modelDir)}` : ''}).`,
-    `## Files changed on this branch since the untouched pull (commit ${d.pullSha!.slice(0, 7)})\n${files.length ? files.map((f) => `- ${join(wt, f)}`).join('\n') : '- none'}`,
-    `Review the changed files against your rules, and check that the plan${d.revisions.length ? ', the revisions' : ''} and the story's acceptance criteria are met.`,
+    `## The branch's changes (the app ran git for you: \`git diff --stat ${diffBase(d)!.slice(0, 7)} HEAD\`)\n\`\`\`\n${stat || '(no changes)'}\n\`\`\`\n${files.map((f) => `- ${join(wt, f)}`).join('\n')}`,
+    `This list is authoritative for the diff scope. Don't fail a rule only because you can't run git yourself. Review the changed files against your rules, and check that the plan${d.revisions.length ? ', the revisions' : ''} and the story's acceptance criteria are met.`,
     `## Plan\n${d.plan}`,
     d.revisions.length && `## Revisions\n${d.revisions.join('\n\n')}`,
     previous && `## Previous QC findings: confirm each one is fixed\n${previous}`,
@@ -454,9 +744,9 @@ function qcBrief(story: string, d: FlowData, pass: number, files: string[], prev
 }
 
 /** "Open" on the Review card: launches the .pbip in Power BI Desktop; the first open per round also moves the story. */
-export async function openForReview(story: string): Promise<{ opened: string; laneMove: 'requested' | 'already' | 'chat_busy' }> {
+export async function openForReview(story: string, approvalId?: string): Promise<{ opened: string; laneMove: 'requested' | 'already' | 'chat_busy' }> {
   const flow = await getFlow(story);
-  if (!flow?.data.worktree || !flow.data.pbip) throw new Error(`No pulled report for ${story}`);
+  if (!flow?.data.worktree || !flow.data.pbip) throw new Error(`No report branch for ${story}`);
   const wt = resolve(flow.data.worktree);
   const pbip = resolve(wt, flow.data.pbip);
   if (relative(resolve(config.powerbi.worktreeRoot), pbip).startsWith('..') || !existsSync(pbip)) throw new Error(`Report project not found: ${pbip}`);
@@ -468,13 +758,14 @@ export async function openForReview(story: string): Promise<{ opened: string; la
     await sendMessage(
       d.conversationId,
       [
-        `I'm opening ${story} in Power BI Desktop to review it. Move ${story} to Ready for testing now (authorised by the card I approved earlier) with a work note in the standard format, then resync. Use these details:`,
+        `I'm opening ${story} in Power BI Desktop to review it. Move ${story} to Ready for testing now (authorised by the Review card) with a work note in the standard format, then resync. Use these details:`,
         `- Summary: ${(d.lastBuilder ?? '').slice(0, 1200)}`,
-        `- QC result: ${d.lastQc?.verdict ?? 'no verdict'}: ${(d.lastQc?.result ?? '').split('\n').slice(0, 3).join(' ').slice(0, 400)}`,
+        `- QC result: ${d.lastQc?.verdict ?? 'not run'}: ${(d.lastQc?.result ?? '').split('\n').slice(0, 3).join(' ').slice(0, 400)}`,
         `- Branch/PR: ${d.branch} (PR opens when I approve publishing)`,
         `- Needs: Matt's review in Power BI Desktop`,
       ].join('\n'),
-      { answersApprovalId: d.permitApprovalId },
+      // The Review card itself authorises this move; older flows fall back to their start/rebuild card.
+      { answersApprovalId: approvalId ?? d.permitApprovalId },
     );
   } catch {
     return { opened: pbip, laneMove: 'chat_busy' };
@@ -508,6 +799,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string) {
   const reportDir = join(wt, data.reportDir!);
   const localPbir = readFileSync(join(reportDir, 'definition.pbir'), 'utf8');
   const pbir = data.modelDir && data.modelName && modelId ? pbirByConnection(localPbir, wsName, data.modelName, modelId) : localPbir;
+  if (JSON.parse(pbir)?.datasetReference?.byPath) throw new Error("The report points at a model folder the app couldn't find, so it can't be published");
   const parts = [...readParts(reportDir).filter((x) => x.path !== 'definition.pbir'), textPart('definition.pbir', pbir)];
   const format = parts.some((x) => x.path === 'report.json') ? 'PBIR-Legacy' : 'PBIR';
   const existingReport = targetItems.find((i) => i.type === 'Report' && i.displayName === data.reportName);
@@ -532,7 +824,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string) {
       description: [
         `ServiceNow story ${story}.`,
         `Summary: ${(data.lastBuilder ?? '').slice(0, 1500)}`,
-        `QC: ${data.lastQc?.verdict ?? 'no verdict'}`,
+        `QC: ${data.lastQc?.verdict ?? 'not run'}`,
         `Published to the ${wsName} workspace: ${reportUrl}`,
         '',
         '🤖 Generated with [Claude Code](https://claude.com/claude-code)',
@@ -548,7 +840,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string) {
     [
       `**Published** *${data.reportName}* to **${wsName}** (${existingReport ? 'updated the existing report' : 'new report'}${data.modelName ? `; model ${modelCreated ? 'created' : 'updated'}` : ''}): [open in Power BI](${reportUrl})`,
       prUrl ? `**Pull request:** [${prUrl.split('/').pop()}](${prUrl}). Merging it is yours.` : `**PR not opened:** ${prError}`,
-      `Still yours: ${[data.modelName && (modelCreated ? 'set the new model\'s data source credentials and refresh it' : 'refresh the model if its schema changed'), 'merge the PR', 'update the app'].filter(Boolean).join(', ')}.`,
+      `Still yours: ${[data.modelName && (modelCreated ? "set the new model's data source credentials and refresh it" : 'refresh the model if its schema changed'), 'merge the PR', 'update the app'].filter(Boolean).join(', ')}.`,
     ].join('\n\n'),
   );
 }
