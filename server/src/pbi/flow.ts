@@ -21,8 +21,9 @@ import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, 
 // always ends in a Review card, and Approve on that card always leads to the Publish card.
 // ServiceNow changes happen only in story-chat turns started by Matt's clicks; the app never touches ServiceNow.
 
-export type Stage = 'pulling' | 'building' | 'idle' | 'review' | 'revising' | 'publishing' | 'published' | 'failed';
-const ACTIVE: Stage[] = ['pulling', 'building', 'publishing'];
+// final_qc: Matt approved the review; pbi-qc checks exactly what will be published before the Publish card.
+export type Stage = 'pulling' | 'building' | 'idle' | 'review' | 'revising' | 'final_qc' | 'publishing' | 'published' | 'failed';
+const ACTIVE: Stage[] = ['pulling', 'building', 'final_qc', 'publishing'];
 
 export interface FlowData {
   conversationId: string;
@@ -54,6 +55,10 @@ export interface FlowData {
   activeRunId?: string;
   lastBuilder?: string;
   lastQc?: { verdict?: string; result: string };
+  /** Head when the Review card went up: later commits are Matt's own edits in Desktop. */
+  reviewSha?: string;
+  /** The pre-publish QC and the commit it checked. */
+  finalQc?: { verdict?: string; result: string; sha: string; runId?: string };
   movedToReadyRound?: number;
   prUrl?: string;
   published?: { workspaceId: string; workspaceName: string; reportUrl: string; modelCreated?: boolean; reportCreated: boolean };
@@ -83,7 +88,7 @@ async function saveFlow(storyNumber: string, stage: Stage, data: FlowData) {
 
 /** Flows a previous server process left mid-step can't resume; mark them failed so the chat can rerun them. */
 export async function recoverInterruptedFlows() {
-  const rows = await query<FlowRow>(`SELECT * FROM dbo.story_flows WHERE stage IN ('pulling', 'building', 'publishing')`);
+  const rows = await query<FlowRow>(`SELECT * FROM dbo.story_flows WHERE stage IN ('pulling', 'building', 'final_qc', 'publishing')`);
   for (const row of rows) {
     const data = JSON.parse(row.data) as FlowData;
     await saveFlow(row.story_number, 'failed', { ...data, activeRunId: undefined, error: `Interrupted while ${row.stage}: server restarted` });
@@ -431,7 +436,7 @@ export async function stopReportWork(p: { parentRunId?: string | null; storyNumb
   const flow = await getFlow(storyNumber);
   if (!flow) throw new Error(`${storyNumber} has no report workflow`);
   if (flow.stage === 'publishing') throw new Error('Publishing is under way and stopping it halfway would leave Fabric half-updated; let it finish');
-  if (flow.stage !== 'building' && flow.stage !== 'pulling') return { stage: flow.stage, note: 'Nothing is running.' };
+  if (flow.stage !== 'building' && flow.stage !== 'pulling' && flow.stage !== 'final_qc') return { stage: flow.stage, note: 'Nothing is running.' };
   await saveFlow(storyNumber, 'idle', { ...flow.data, activeRunId: undefined });
   if (flow.data.activeRunId) cancelClaudeRun(flow.data.activeRunId);
   await postAppNote(flow.data.conversationId, `Stopped the builder ⇄ QC loop${p.reason ? `: ${p.reason}` : ''}. \`${flow.data.branch}\` keeps what was committed. Rebuild, review or start over from here.`);
@@ -462,6 +467,10 @@ async function supersedeFlowCards(storyNumber: string) {
 
 async function raiseReviewCard(story: string, d: FlowData, qc?: { verdict?: string; result: string }) {
   await supersedeFlowCards(story);
+  if (d.worktree) {
+    const current = await getFlow(story);
+    if (current) await saveFlow(story, current.stage, { ...current.data, reviewSha: await headSha(d.worktree), finalQc: undefined });
+  }
   const base = diffBase(d);
   const changed = base && d.worktree ? await changedFiles(d.worktree, base) : [];
   const builder = d.lastBuilder ?? '';
@@ -539,14 +548,10 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
 
   if (approval.kind === 'pbi_review') {
     if (approve) {
-      const card = await createApproval({
-        kind: 'pbi_publish',
-        title: `${story}: publish "${flow.data.reportName}" and open the PR`,
-        payload: { conversationId: p.conversationId, storyNumber: story, reportName: flow.data.reportName, modelName: flow.data.modelName ?? '', branch: flow.data.branch },
-        requestedByRunId: null,
-      });
-      await postApprovalCard(p.conversationId, card.id);
-      return 'Approved: choose the workspace on the Publish card';
+      assertNotActive(story, flow);
+      await saveFlow(story, 'final_qc', flow.data);
+      void pipeline(story, approval.id, () => finalQc(story));
+      return 'Approved: final QC, then the Publish card';
     }
     await sendMessage(
       p.conversationId,
@@ -684,7 +689,7 @@ async function pullFromFabric(story: string, wt: string) {
 }
 
 /** Runs a worker for the loop. Returns undefined if the loop was stopped meanwhile. */
-async function runWorker(worker: string, brief: string, story: string, projectPath: string): Promise<Run | undefined> {
+async function runWorker(worker: string, brief: string, story: string, projectPath: string, stage: Stage = 'building'): Promise<Run | undefined> {
   const run = await createRun({
     kind: 'worker',
     worker,
@@ -693,12 +698,12 @@ async function runWorker(worker: string, brief: string, story: string, projectPa
     meta: { brief, projectPath, flow: true },
   });
   const before = await getFlow(story);
-  if (before?.stage !== 'building') return undefined;
-  await saveFlow(story, 'building', { ...before.data, activeRunId: run.id });
+  if (before?.stage !== stage) return undefined;
+  await saveFlow(story, stage, { ...before.data, activeRunId: run.id });
   await startWorkerRun(run.id);
   const after = await getFlow(story);
-  if (after?.stage !== 'building') return undefined; // stopped while it ran
-  await saveFlow(story, 'building', { ...after.data, activeRunId: undefined });
+  if (after?.stage !== stage) return undefined; // stopped while it ran
+  await saveFlow(story, stage, { ...after.data, activeRunId: undefined });
   return getRun(run.id);
 }
 
@@ -820,6 +825,8 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
   const wsName = ws.displayName.trim();
   // Anything Matt saved in Desktop during review goes in too.
   await commitAll(wt, `${story}: changes saved in Power BI Desktop during review`);
+  const qcd = before.finalQc;
+  const afterQc = qcd ? await changedFiles(wt, qcd.sha) : [];
   // The name on the card becomes the name in the repo too, so git and Fabric match.
   const modelFollows = !!before.modelName && before.modelName === before.reportName;
   const data = await renameInRepo(story, before, choice.name);
@@ -882,7 +889,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
       description: [
         `ServiceNow story ${story}.`,
         `Summary: ${(data.lastBuilder ?? '').slice(0, 1500)}`,
-        `QC: ${data.lastQc?.verdict ?? 'not run'}`,
+        `Final QC before publishing: ${qcd?.verdict ?? 'not run'}${afterQc.length ? ` (${afterQc.length} files changed after it and weren't QC'd)` : ''}`,
         `Published to the ${wsName} workspace: ${reportUrl}`,
         '',
         '🤖 Generated with [Claude Code](https://claude.com/claude-code)',
@@ -898,6 +905,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
     [
       `**Published** to **${wsName}**: ${[touched.report, touched.model].filter(Boolean).join('; ')}. [Open in Power BI](${reportUrl})`,
       data.reportName !== before.reportName && `Renamed in the repo too: \`${before.reportDir}\` → \`${data.reportDir}\`.`,
+      afterQc.length > 0 && `**Heads up:** ${afterQc.length} file(s) changed after the final QC (saved in Desktop after it ran), so QC didn't see them: ${afterQc.slice(0, 5).map((f) => `\`${f}\``).join(', ')}${afterQc.length > 5 ? ', …' : ''}.`,
       prUrl ? `**Pull request:** [${prUrl.split('/').pop()}](${prUrl}). Merging it is yours.` : `**PR not opened:** ${prError}`,
       `Still yours: ${[data.modelName && (modelCreated ? "set the new model's data source credentials and refresh it" : 'refresh the model if its schema changed'), 'merge the PR', 'update the app'].filter(Boolean).join(', ')}.`,
     ]
@@ -980,4 +988,71 @@ export async function renameInRepo(story: string, d: FlowData, name: string): Pr
   }
   await commitAll(wt, `${story}: rename report "${oldName}" to "${name}"`);
   return { ...d, reportName: name, modelName, reportDir: newReportRel, modelDir: newModelRel, pbip: newPbipRel };
+}
+
+/**
+ * Between Matt's review and the Publish card: commit what he saved in Desktop, run pbi-qc once more on exactly what
+ * will be published, post the report, then put the Publish card up with the verdict. A FAIL doesn't block
+ * publishing; Matt decides with the report in front of him.
+ */
+async function finalQc(story: string) {
+  const { data } = (await getFlow(story))!;
+  const wt = data.worktree!;
+  const base = diffBase(data)!;
+  await commitAll(wt, `${story}: changes saved in Power BI Desktop during review`);
+  const sha = await headSha(wt);
+  const files = await changedFiles(wt, base);
+  const stat = await diffStat(wt, base);
+  const manual = data.reviewSha ? await changedFiles(wt, data.reviewSha) : [];
+  await postAppNote(
+    data.conversationId,
+    `Final QC started on exactly what will be published (${files.length} files changed on the branch${manual.length ? `, including ${manual.length} you changed in Desktop during review` : ''}).`,
+  );
+
+  let qc: { verdict?: string; result: string; runId?: string } = { verdict: 'not run', result: '' };
+  const q = await runWorker('pbi-qc', finalQcBrief(story, data, files, stat, manual), story, wt, 'final_qc');
+  if (!q) return; // stopped
+  if (q.status === 'succeeded') qc = { verdict: parseMeta<{ verdict?: string }>(q).verdict ?? 'no verdict', result: q.result ?? '', runId: q.id };
+  else qc = { verdict: 'not run', result: `QC didn't finish (${q.status}${q.error ? `: ${q.error}` : ''}).`, runId: q.id };
+
+  const current = await getFlow(story);
+  if (current?.stage !== 'final_qc') return;
+  const next: FlowData = { ...current.data, finalQc: { ...qc, sha } };
+  await saveFlow(story, 'review', next);
+  await postAppNote(data.conversationId, `**Final QC: ${qc.verdict}**\n\n${qc.result.slice(0, 6000)}`);
+  const card = await createApproval({
+    kind: 'pbi_publish',
+    title: `${story}: publish "${next.reportName}" and open the PR`,
+    payload: {
+      conversationId: data.conversationId,
+      storyNumber: story,
+      reportName: next.reportName,
+      modelName: next.modelName ?? '',
+      branch: next.branch,
+      qcVerdict: qc.verdict ?? 'not run',
+      qcReport: qc.result.slice(0, 8000),
+      manualFiles: String(manual.length),
+      qcRunId: qc.runId ?? '',
+    },
+    requestedByRunId: null,
+  });
+  await postApprovalCard(data.conversationId, card.id);
+}
+
+function finalQcBrief(story: string, d: FlowData, files: string[], stat: string, manual: string[]): string {
+  const wt = d.worktree!;
+  return [
+    `Story ${story}: FINAL pre-publish QC of "${d.reportName}". Matt has reviewed the report in Power BI Desktop and approved it. This is exactly what will be published to Fabric and go into the PR, so report every issue you see.`,
+    `Target project: ${join(wt, dirname(d.reportDir!))} (report ${basename(d.reportDir!)}${d.modelDir ? `, model ${basename(d.modelDir)}` : ''}).`,
+    `## Everything this branch changes (the app ran git for you: \`git diff --stat ${diffBase(d)!.slice(0, 7)} HEAD\`)\n\`\`\`\n${stat || '(no changes)'}\n\`\`\`\n${files.map((f) => `- ${join(wt, f)}`).join('\n')}`,
+    manual.length
+      ? `## Changed by Matt in Desktop during his review (not seen by any earlier QC run: look at these closely)\n${manual.map((f) => `- ${join(wt, f)}`).join('\n')}`
+      : '## Changed by Matt in Desktop during his review\nNothing.',
+    "This list is authoritative for the diff scope. Don't fail a rule only because you can't run git. Check the changed files against your rules, and check that the plan, the revisions and the story's acceptance criteria are met. Issues that were already there before this branch are PRE-EXISTING (out of scope), as your lessons say.",
+    `## Plan\n${d.plan}`,
+    d.revisions.length && `## Revisions\n${d.revisions.join('\n\n')}`,
+    'After your usual PASS/FAIL line and table, add:\n\n### What is being published\n3–6 plain bullets: what changes for report users, anything risky, and anything Matt should check after publishing.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }

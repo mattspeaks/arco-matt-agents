@@ -163,6 +163,18 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
     <div className="approval pbi_publish">
       <div className="approval-kind small">Publish report</div>
       <div className="approval-title">{approval.title}</div>
+      {p.qcVerdict && (
+        <details className="final-qc" open={pending && p.qcVerdict !== 'PASS'}>
+          <summary className="small">
+            Final QC on what you&apos;re publishing:{' '}
+            <span className={`tag ${p.qcVerdict === 'PASS' ? 'pass' : p.qcVerdict === 'FAIL' ? 'fail' : 'subtle'}`}>{p.qcVerdict}</span>
+            {Number(p.manualFiles) > 0 && <span className="muted"> · includes {p.manualFiles} file(s) you changed in Desktop</span>}
+          </summary>
+          <div className="approval-preview md small">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.qcReport || '_No report._'}</ReactMarkdown>
+          </div>
+        </details>
+      )}
       {pending ? (
         <>
           <label className="small muted" htmlFor={`ws-${approval.id}`}>

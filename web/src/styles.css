@@ -305,3 +305,6 @@ pre.note {
 .time-day.today { border-color: var(--accent); }
 .time-day .input { margin: 0; padding: 4px 6px; width: 100%; min-width: 0; }
 @media (max-width: 640px) { .time-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.final-qc { margin: 4px 0 8px; }
+.final-qc summary { cursor: pointer; }
+.final-qc .approval-preview { max-height: 320px; overflow: auto; }
