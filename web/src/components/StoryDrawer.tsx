@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { fmtTime, parseJson } from '../api';
 import { DAYS, type Board, type Run, type Story, type Timesheet } from '../types';
 import { StatusPill } from './ActivityPanel';
+import { CloseoutCard, useChecklist } from './CloseoutCard';
+import { api } from '../api';
 
 export function StoryDrawer({
   story,
@@ -10,6 +12,7 @@ export function StoryDrawer({
   runs,
   onClose,
   onOpenRun,
+  onError,
   hasChat,
   onDiscuss,
 }: {
@@ -19,9 +22,11 @@ export function StoryDrawer({
   runs: Run[];
   onClose: () => void;
   onOpenRun: (id: string) => void;
+  onError: (m: string) => void;
   hasChat: boolean;
   onDiscuss: () => void;
 }) {
+  const checklist = useChecklist(story.number);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -67,6 +72,19 @@ export function StoryDrawer({
               Not in an agent queue. Add a routing hashtag (e.g. #PowerBI or #DWH) to the story's description in ServiceNow, then sync.
             </p>
           )}
+          <section>
+            <h3 className="section-title">Close-out</h3>
+            {checklist ? (
+              <CloseoutCard story={story.number} onError={onError} />
+            ) : checklist === null ? (
+              <>
+                <p className="small muted">Your definition of done for this story. It starts on its own after a publish.</p>
+                <button className="btn ghost small" onClick={() => void api(`/api/stories/${story.number}/checklist`, { body: {} }).catch((e) => onError((e as Error).message))}>
+                  Start close-out checklist
+                </button>
+              </>
+            ) : null}
+          </section>
           <section>
             <h3 className="section-title">Description</h3>
             <div className="prewrap story-text">{story.description || <span className="muted">None</span>}</div>

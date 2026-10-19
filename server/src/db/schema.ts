@@ -140,4 +140,13 @@ export const SCHEMA: string[] = [
   // Early syncs stored timesheets whose id the Chrome extension had blanked; drop them and their rows.
   `DELETE FROM dbo.time_cards WHERE time_sheet_id LIKE '%[^0-9a-f]%' OR time_sheet_id IN (SELECT sys_id FROM dbo.timesheets WHERE sys_id LIKE '%[^0-9a-f]%')`,
   `DELETE FROM dbo.timesheets WHERE sys_id LIKE '%[^0-9a-f]%'`,
+
+  // Close-out: Matt's definition-of-done checklist per story (closeout.ts), and archived chats.
+  `IF OBJECT_ID('dbo.story_checklists') IS NULL CREATE TABLE dbo.story_checklists (
+     story_number NVARCHAR(40)  NOT NULL PRIMARY KEY,
+     items        NVARCHAR(MAX) NOT NULL,
+     created_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+     closed_at    DATETIME2     NULL
+   )`,
+  `IF COL_LENGTH('dbo.conversations', 'archived_at') IS NULL ALTER TABLE dbo.conversations ADD archived_at DATETIME2 NULL`,
 ];

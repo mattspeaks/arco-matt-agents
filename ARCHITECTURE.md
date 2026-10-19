@@ -307,6 +307,25 @@ One workflow per story. It owns the story's branch, and it can change course at 
 If the server restarts in the middle of a step, the flow is marked failed. The orchestrator can rerun it with a
 rebuild card.
 
+### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
+Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:
+- **Close-out card.** After a publish, the story chat gets Matt's checklist. The default is in
+  `config.closeoutChecklist`: app published for business review, PRs completed, published to production, final
+  adjustments and sign-off. It's his list. He ticks items, adds notes, and adds or removes items for the story. The
+  app ticks an item only when it can prove it: "PRs completed" ticks when the story's PR shows completed in Azure
+  DevOps (a read-only check). The card is also in the story panel, and `start_closeout` or the panel starts it for
+  stories that weren't published through the workflow.
+- **The story stays open until every item is ticked.** Until then the chat list and the board card show
+  "close-out n/m".
+- **Close story card.** When all items are ticked, Matt's Close story… opens a card covering:
+  1. a final work note, which lists the checklist with dates, the published report and the PR (the lane isn't
+     touched: Complete is Matt's);
+  2. a last Timesheet card;
+  3. removal of the agent's worktree and local branch, if the PR is completed;
+  4. archiving the chat.
+- **Archive.** Any chat can be archived or reopened from the chat header. Archived chats sit in their own group in
+  the chat list. Nothing is deleted, and writing in an archived chat reopens it.
+
 ---
 
 ## 6. Learning loop

@@ -63,6 +63,11 @@ export function App() {
           case 'board':
             loadBoard();
             break;
+          case 'checklist':
+            window.dispatchEvent(new CustomEvent('arco:checklist', { detail: m.payload }));
+            loadBoard(); // close-out badges on the board
+            void api<Conversation[]>('/api/conversations').then(setConversations); // and in the chat list
+            break;
         }
       }, setConnected),
     [loadBoard],
@@ -121,6 +126,7 @@ export function App() {
           runs={runs.filter((r) => r.story_number === openStory.number)}
           onClose={() => setOpenStory(null)}
           onOpenRun={setOpenRunId}
+          onError={setError}
           hasChat={conversations.some((c) => c.story_number === openStory.number)}
           onDiscuss={() => {
             const story = openStory;

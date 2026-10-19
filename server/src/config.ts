@@ -38,6 +38,8 @@ export interface AppConfig {
   };
   claude: { bin: string; syncModel: string; orchestratorModel: string; defaultWorkerModel: string };
   projectRoots: string[];
+  /** Matt's default close-out list for a story; auto: 'pr' items tick themselves when the story's PR completes. */
+  closeoutChecklist: { label: string; auto?: 'pr' }[];
   powerbi: {
     repoPath: string;
     /** Per-story git worktrees of the PowerBI repo (agent branches). */

@@ -14,6 +14,7 @@ export interface Conversation {
   title: string;
   session_id: string | null;
   story_number: string | null; // set for a story chat; NULL for the main chat(s)
+  archived_at: string | null; // archived chats sit under Archived in the chat list
   created_at: string;
   updated_at: string;
 }
@@ -64,9 +65,26 @@ export async function getConversation(id: string) {
 }
 
 export async function listConversations() {
-  return query<Conversation & { busy_run_id?: string }>('SELECT TOP 50 * FROM dbo.conversations ORDER BY updated_at DESC').then((rows) =>
-    rows.map((c) => ({ ...c, busy_run_id: busy.get(c.id) })),
-  );
+  const [rows, closeouts] = await Promise.all([
+    query<Conversation>('SELECT TOP 100 * FROM dbo.conversations ORDER BY updated_at DESC'),
+    query<{ story_number: string; items: string; closed_at: string | null }>('SELECT story_number, items, closed_at FROM dbo.story_checklists'),
+  ]);
+  const progress = new Map(closeouts.map((c) => {
+    const items = JSON.parse(c.items) as { done: boolean }[];
+    return [c.story_number, { done: items.filter((i) => i.done).length, total: items.length, closed: !!c.closed_at }];
+  }));
+  return rows.map((c) => ({ ...c, busy_run_id: busy.get(c.id), closeout: c.story_number ? progress.get(c.story_number) : undefined }));
+}
+
+/** Archive or reopen a chat. Nothing is deleted. */
+export async function archiveConversation(id: string, archived: boolean) {
+  await query(`UPDATE dbo.conversations SET archived_at = ${archived ? 'SYSUTCDATETIME()' : 'NULL'} WHERE id = ?`, [id]);
+  publish('conversation', await getConversation(id));
+}
+
+/** The story's close-out checklist, shown as a live card in the chat (content = story number). */
+export async function postChecklistCard(conversationId: string, storyNumber: string) {
+  await addMessage(conversationId, 'checklist', storyNumber);
 }
 
 export async function getMessages(conversationId: string) {
@@ -85,7 +103,7 @@ export async function postAppNote(conversationId: string, text: string) {
   await addMessage(conversationId, 'app', text);
 }
 
-async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error' | 'approval' | 'app', content: string, runId?: string) {
+async function addMessage(conversationId: string, role: 'user' | 'assistant' | 'error' | 'approval' | 'app' | 'checklist', content: string, runId?: string) {
   const [row] = await query(
     `INSERT INTO dbo.chat_messages (conversation_id, role, content, run_id)
      OUTPUT inserted.id, inserted.conversation_id, inserted.role, inserted.content, inserted.run_id, inserted.created_at
@@ -127,6 +145,11 @@ Changing course:
 - Whenever a report is ready for Matt to look at and no Review card is pending: \`request_review\`. Never leave him
   with a finished build and no Review card.
 - Something the workflow can't do: tell Matt before doing anything else, rather than working around it.
+
+Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When
+they're all done, he closes the story from the card, and the app has you add the final work note. Moving the story to
+Complete is his. Don't propose it. \`start_closeout\` puts the checklist up for a story that wasn't published through the
+workflow.
 \`get_report_flow\` shows where the workflow is.`;
 
 function systemPrompt(conv: Conversation): string {
@@ -207,6 +230,9 @@ export async function sendMessage(
   if (!conv) throw Object.assign(new Error('Conversation not found'), { statusCode: 404 });
   const running = busy.get(conversationId);
   if (running && isRunActive(running)) throw Object.assign(new Error('The orchestrator is still working on the previous message'), { statusCode: 409 });
+
+  // Writing in an archived chat reopens it.
+  if (conv.archived_at) await archiveConversation(conversationId, false);
 
   if (conv.title === 'New conversation') {
     await query('UPDATE dbo.conversations SET title = ? WHERE id = ?', [text.slice(0, 80), conversationId]);

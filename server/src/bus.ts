@@ -10,7 +10,8 @@ export type LiveType =
   | 'chat_message'
   | 'approval'
   | 'board'
-  | 'conversation';
+  | 'conversation'
+  | 'checklist';
 
 export function publish(type: LiveType, payload: unknown): void {
   bus.emit('live', { type, payload });

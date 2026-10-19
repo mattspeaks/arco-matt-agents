@@ -127,6 +127,16 @@ async function adoRepo(): Promise<{ apiBase: string; webUrl: string }> {
   return { apiBase: `${org}/${project}/_apis/git/repositories/${repo}`, webUrl: `${org}/${project}/_git/${repo}` };
 }
 
+/** A PR's status from its web URL: active, completed or abandoned. Read-only. */
+export async function pullRequestStatus(prUrl: string): Promise<string | undefined> {
+  const id = /\/pullrequest\/(\d+)/.exec(prUrl)?.[1];
+  if (!id) return undefined;
+  const { apiBase } = await adoRepo();
+  const res = await fetch(`${apiBase}/pullrequests/${id}?api-version=7.1`, { headers: { Authorization: `Bearer ${await azToken(RESOURCE.devops)}` } });
+  if (!res.ok) throw new Error(`Azure DevOps PR ${id} → ${res.status}`);
+  return ((await res.json()) as { status?: string }).status;
+}
+
 /** Opens a PR (or returns the open one) for branch → base. Never completes or merges it. */
 export async function openPullRequest(p: { branch: string; title: string; description: string }): Promise<string> {
   const { apiBase, webUrl } = await adoRepo();

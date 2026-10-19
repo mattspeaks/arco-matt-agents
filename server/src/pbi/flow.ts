@@ -11,6 +11,7 @@ import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../
 import { createRun, getRun, parseMeta, type Run } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { askTimeEntry } from '../timesheet.js';
+import { startCloseout } from '../closeout.js';
 import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
 import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
@@ -914,6 +915,8 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
   );
   // Last step: how much time to log for the story (a failure here mustn't look like a failed publish).
   await askTimeEntry(data.conversationId, story).catch((err) => postAppNote(data.conversationId, `Couldn't put up the Timesheet card: ${err instanceof Error ? err.message : err}`));
+  // From here the rollout is Matt's: his close-out list keeps the story open until it's done.
+  await startCloseout(story).catch(() => undefined);
 }
 
 /** Sets an item folder's .platform display name (creating .platform if the folder has none). */

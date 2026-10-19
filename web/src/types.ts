@@ -29,6 +29,8 @@ export interface Board {
   instanceUrl: string;
   /** Matt's name as it appears in assigned_to. */
   me?: string;
+  /** Close-out progress per story number. */
+  closeouts?: Record<string, CloseoutProgress>;
 }
 
 export interface TimeCard {
@@ -88,7 +90,7 @@ export interface RunEvent {
 
 export interface Approval {
   id: string;
-  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'time_entry';
+  kind: 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'time_entry' | 'story_close';
   title: string;
   payload: string;
   status: 'pending' | 'approved' | 'rejected' | 'superseded';
@@ -103,14 +105,39 @@ export interface Conversation {
   title: string;
   session_id: string | null;
   story_number: string | null; // a story chat; null = main chat
+  archived_at?: string | null;
   updated_at: string;
   busy_run_id?: string;
+  closeout?: CloseoutProgress;
+}
+
+export interface CloseoutProgress {
+  done: number;
+  total: number;
+  closed: boolean;
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+  doneAt?: string;
+  doneBy?: 'matt' | 'app';
+  note?: string;
+  auto?: 'pr';
+}
+
+export interface Checklist {
+  story_number: string;
+  items: ChecklistItem[];
+  created_at: string;
+  closed_at: string | null;
 }
 
 export interface ChatMessage {
   id: number;
   conversation_id: string;
-  role: 'user' | 'assistant' | 'error' | 'approval' | 'app'; // approval: content is an approval id, shown as a card; app: a note from the app
+  role: 'user' | 'assistant' | 'error' | 'approval' | 'app' | 'checklist'; // approval: content is an approval id, shown as a card; app: a note from the app; checklist: content is a story number (its close-out card)
   content: string;
   run_id: string | null;
   created_at: string;

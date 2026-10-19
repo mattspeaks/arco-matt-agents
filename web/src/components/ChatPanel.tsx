@@ -5,6 +5,7 @@ import { api, fmtTime } from '../api';
 import { useRunEvents } from '../runEvents';
 import type { Approval, ChatMessage, Conversation } from '../types';
 import { ApprovalCard } from './ActivityPanel';
+import { CloseoutCard } from './CloseoutCard';
 
 const ACTIVE_KEY = 'arco.activeConversation';
 
@@ -40,6 +41,8 @@ export function ChatPanel({
   const { events } = useRunEvents(pendingRunId);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
+  const open = conversations.filter((c) => !c.archived_at);
+  const archived = conversations.filter((c) => c.archived_at);
 
   useEffect(() => {
     if (!activeId && conversations.length) setActiveId(conversations[0].id);
@@ -118,20 +121,32 @@ export function ChatPanel({
       <div className="panel-head">
         <select className="input select" value={activeId ?? ''} onChange={(e) => setActiveId(e.target.value || null)} aria-label="Conversation">
           {!conversations.length && <option value="">No conversations yet</option>}
-          {conversations.some((c) => !c.story_number) && (
+          {open.some((c) => !c.story_number) && (
             <optgroup label="Main">
-              {conversations.filter((c) => !c.story_number).map((c) => (
+              {open.filter((c) => !c.story_number).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
                 </option>
               ))}
             </optgroup>
           )}
-          {conversations.some((c) => c.story_number) && (
+          {open.some((c) => c.story_number) && (
             <optgroup label="Stories">
-              {conversations.filter((c) => c.story_number).map((c) => (
+              {open.filter((c) => c.story_number).map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.busy_run_id ? '● ' : ''}{c.title}
+                  {c.busy_run_id ? '● ' : ''}
+                  {c.title}
+                  {c.closeout && !c.closeout.closed ? `  · close-out ${c.closeout.done}/${c.closeout.total}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {archived.length > 0 && (
+            <optgroup label={`Archived (${archived.length})`}>
+              {archived.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.closeout?.closed ? '✓ ' : ''}
+                  {c.title}
                 </option>
               ))}
             </optgroup>
@@ -140,7 +155,17 @@ export function ChatPanel({
         <button className="btn ghost" onClick={() => void newConversation()}>
           + New
         </button>
+        {active && (
+          <button
+            className="btn ghost"
+            title={active.archived_at ? 'Move this chat back to the chat list' : 'Move this chat to Archived. Nothing is deleted.'}
+            onClick={() => void api(`/api/conversations/${active.id}/archive`, { body: { archived: !active.archived_at } }).catch((e) => onError((e as Error).message))}
+          >
+            {active.archived_at ? 'Reopen' : 'Archive'}
+          </button>
+        )}
       </div>
+      {active?.archived_at && <div className="archived-banner small">Archived. Sending a message reopens this chat.</div>}
 
       <div className="panel-body chat-list" ref={listRef}>
         {messages.length === 0 && !pendingRunId && (
@@ -150,10 +175,17 @@ export function ChatPanel({
           </div>
         )}
         {messages.map((m) => {
+          if (m.role === 'checklist') {
+            return (
+              <div key={m.id} className="chat-card">
+                <CloseoutCard story={m.content} onError={onError} />
+              </div>
+            );
+          }
           if (m.role === 'approval') {
             const approval = approvals.find((a) => a.id === m.content);
             // Report workflow cards live in the story chat as well as in Approvals.
-            if (approval && (approval.kind.startsWith('pbi_') || approval.kind === 'time_entry')) {
+            if (approval && (approval.kind.startsWith('pbi_') || approval.kind === 'time_entry' || approval.kind === 'story_close')) {
               return (
                 <div key={m.id} className="chat-card">
                   <ApprovalCard approval={approval} onError={onError} />

@@ -101,6 +101,7 @@ const KIND_TITLE: Partial<Record<Approval['kind'], string>> = {
   lesson: 'New lesson',
   pbi_start: 'Start report work',
   pbi_revise: 'Revise report',
+  story_close: 'Close story',
 };
 
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
@@ -121,7 +122,7 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
     <div className={`approval ${approval.kind}`}>
       <div className="approval-kind small">{KIND_TITLE[approval.kind] ?? approval.kind}</div>
       <div className="approval-title">{approval.title}</div>
-      {['sn_confirm', 'pbi_start', 'pbi_revise'].includes(approval.kind) && p.preview && (
+      {['sn_confirm', 'pbi_start', 'pbi_revise', 'story_close'].includes(approval.kind) && p.preview && (
         <div className="approval-preview md small">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
         </div>

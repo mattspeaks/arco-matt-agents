@@ -313,3 +313,13 @@ pre.note {
 .person-filter { flex: 0 1 180px; min-width: 120px; }
 .person-filter.active { border-color: var(--accent); }
 .board-filters { flex-wrap: wrap; }
+/* Close-out checklist */
+.checklist { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.checklist label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.checklist input[type='checkbox'] { margin-top: 3px; }
+.checklist li.done > label span { color: var(--muted); text-decoration: line-through; }
+.checklist-meta { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 24px; }
+.checklist-note { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+.checklist-note .input { flex: 1; margin: 0; }
+.approval.closeout.closed { opacity: 0.85; }
+.archived-banner { padding: 6px 12px; background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid var(--border); }

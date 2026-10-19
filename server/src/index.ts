@@ -7,11 +7,12 @@ import { initDb, query } from './db/index.js';
 import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
 import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
-import { createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
+import { archiveConversation, createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
+import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
 await recoverInterruptedRuns();
@@ -27,6 +28,14 @@ app.setErrorHandler((err: FastifyError, _req, reply) => {
 });
 
 const bad = (message: string, statusCode = 400) => Object.assign(new Error(message), { statusCode });
+// Turns a thrown error into a 400 with its message (for errors meant for the caller).
+const agentCall = async <T>(fn: () => Promise<T>) => {
+  try {
+    return await fn();
+  } catch (err) {
+    throw bad((err as Error).message);
+  }
+};
 
 // Browsers attach Origin to cross-site requests and websocket upgrades; only our own UI may call in.
 // The MCP server (Node fetch) sends no Origin.
@@ -46,8 +55,8 @@ app.get('/ws', { websocket: true }, (socket) => {
 
 // ---- UI API -------------------------------------------------------------------------------------
 app.get('/api/board', async () => {
-  const [stories, lanes, syncedAt] = await Promise.all([listStories(), getLanes(), lastSyncAt()]);
-  return { stories, lanes, syncedAt, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl, me: config.servicenow.myName };
+  const [stories, lanes, syncedAt, closeouts] = await Promise.all([listStories(), getLanes(), lastSyncAt(), closeoutSummary()]);
+  return { stories, lanes, syncedAt, closeouts, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl, me: config.servicenow.myName };
 });
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,6 +86,30 @@ app.post<{ Params: { id: string } }>('/api/runs/:id/cancel', async (req) => ({ c
 app.get('/api/conversations', async () => listConversations());
 app.post<{ Body: { title?: string } }>('/api/conversations', async (req) => createConversation(req.body?.title));
 app.get<{ Params: { id: string } }>('/api/conversations/:id/messages', async (req) => getMessages(req.params.id));
+app.post<{ Params: { id: string }; Body: { archived?: boolean } }>('/api/conversations/:id/archive', async (req) => {
+  if (!(await getConversation(req.params.id))) throw bad('Conversation not found', 404);
+  await archiveConversation(req.params.id, req.body?.archived !== false);
+  return getConversation(req.params.id);
+});
+
+// ---- close-out checklist (closeout.ts) ----------------------------------------------------------
+const storyParam = (n: string) => {
+  const number = n.toUpperCase();
+  if (!/^[A-Z]+\d+$/.test(number)) throw bad('Invalid story number');
+  return number;
+};
+app.get<{ Params: { number: string } }>('/api/stories/:number/checklist', async (req) => getChecklist(storyParam(req.params.number)));
+app.post<{ Params: { number: string } }>('/api/stories/:number/checklist', async (req) => startCloseout(storyParam(req.params.number)));
+app.post<{ Params: { number: string }; Body: { label?: string } }>('/api/stories/:number/checklist/items', async (req) =>
+  agentCall(() => addItem(storyParam(req.params.number), String(req.body?.label ?? ''))),
+);
+app.post<{ Params: { number: string; id: string }; Body: { done?: boolean; note?: string } }>('/api/stories/:number/checklist/items/:id', async (req) =>
+  agentCall(() => setItem(storyParam(req.params.number), req.params.id, { done: req.body?.done, note: req.body?.note })),
+);
+app.delete<{ Params: { number: string; id: string } }>('/api/stories/:number/checklist/items/:id', async (req) =>
+  agentCall(() => removeItem(storyParam(req.params.number), req.params.id)),
+);
+app.post<{ Params: { number: string } }>('/api/stories/:number/close', async (req) => agentCall(() => requestClose(storyParam(req.params.number))));
 app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations/:id/messages', async (req) => {
   const text = req.body?.text?.trim();
   if (!text) throw bad('text is required');
@@ -220,13 +253,6 @@ app.post<{ Body: AgentBody }>('/api/agent/propose_lesson', async (req) => {
 
 app.post('/api/agent/list_approvals', async () => listApprovals('pending'));
 
-const agentCall = async <T>(fn: () => Promise<T>) => {
-  try {
-    return await fn();
-  } catch (err) {
-    throw bad((err as Error).message);
-  }
-};
 app.post<{ Body: AgentBody }>('/api/agent/list_fabric_items', async (req) => agentCall(() => listFabric(str(req.body.workspace))));
 app.post<{ Body: AgentBody }>('/api/agent/propose_report_work', async (req) => {
   const [workspace, report, repoReport, plan, workNote] = [str(req.body.workspace), str(req.body.report), str(req.body.repo_report), str(req.body.plan), str(req.body.work_note)];
@@ -252,6 +278,12 @@ app.post<{ Body: AgentBody }>('/api/agent/ask_time_entry', async (req) => {
   const story = str(req.body.story_number) ?? conv?.story_number ?? undefined;
   if (!conv || !story) throw bad('ask_time_entry needs a story (story_number, or use it in a story chat)');
   return agentCall(() => askTimeEntry(conv.id, story));
+});
+app.post<{ Body: AgentBody }>('/api/agent/start_closeout', async (req) => {
+  const run = req.body.parentRunId ? await getRun(req.body.parentRunId) : undefined;
+  const conv = run?.conversation_id ? await getConversation(run.conversation_id) : undefined;
+  if (!conv?.story_number) throw bad('start_closeout only works in a story chat');
+  return agentCall(() => getChecklist(conv.story_number!).then((c) => c ?? startCloseout(conv.story_number!)));
 });
 app.post<{ Body: AgentBody }>('/api/agent/stop_report_work', async (req) => agentCall(() => stopReportWork({ parentRunId: req.body.parentRunId, reason: str(req.body.reason) })));
 

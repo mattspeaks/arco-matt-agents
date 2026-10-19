@@ -186,6 +186,15 @@ server.registerTool(
 );
 
 server.registerTool(
+  'start_closeout',
+  {
+    description:
+      "Story chats only. Puts Matt's close-out checklist in the chat (his definition of done: app published for business review, PRs completed, published to production, sign-off). It appears on its own after a publish; use this when he wants to start wrapping up a story without the report workflow. Matt ticks the items himself, and when they're all done he closes the story from the card.",
+  },
+  () => call('start_closeout'),
+);
+
+server.registerTool(
   'ask_time_entry',
   {
     description:

@@ -40,6 +40,12 @@
     "defaultWorkerModel": "sonnet"
   },
   "projectRoots": ["C:/Users/mspeaks/source/repos"],
+  "closeoutChecklist": [
+    { "label": "Report published to the App for business review" },
+    { "label": "PRs completed", "auto": "pr" },
+    { "label": "Published to Production" },
+    { "label": "Final adjustments and sign-off" }
+  ],
   "powerbi": {
     "repoPath": "C:/Users/mspeaks/source/repos/PowerBI",
     "worktreeRoot": "C:/Users/mspeaks/source/repos/PowerBI-agent-worktrees",

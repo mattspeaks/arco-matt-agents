@@ -126,6 +126,14 @@ export function BoardPanel({ board, timesheet, onOpenStory }: { board: Board | n
                         <div className="card-top">
                           <span className="mono small">{s.number}</span>
                           {s.domain && <span className={`tag ${s.domain}`}>{s.domain.toUpperCase()}</span>}
+                          {board?.closeouts?.[s.number] &&
+                            (board.closeouts[s.number].closed ? (
+                              <span className="tag pass">✓ closed</span>
+                            ) : (
+                              <span className="tag subtle" title="Close-out checklist">
+                                close-out {board.closeouts[s.number].done}/{board.closeouts[s.number].total}
+                              </span>
+                            ))}
                           {s.story_points && <span className="muted small push">{s.story_points} pts</span>}
                         </div>
                         <div className="card-title">{s.short_description}</div>
