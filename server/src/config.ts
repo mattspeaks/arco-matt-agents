@@ -22,6 +22,8 @@ export interface AppConfig {
   servicenow: {
     instanceUrl: string;
     boardSysId: string;
+    /** The team's group (ABS Data and Analytics); stories are created in it and never moved out. */
+    assignmentGroup: string;
     storyTable: string;
     timesheetPortalUrl: string;
     routingTags: Record<string, string[]>;

@@ -115,4 +115,4 @@ created;
 
 - Check that each returned state is the one you intended. Reply with each new number linked to
   `https://arcoconstruction.service-now.com/rm_story.do?sys_id=<sys_id without dashes>`.
-- Re-run the board snapshot from reading.md. If Matt then wants to work one of them, suggest its story chat.
+- Run the story snapshot from reading.md for each new story, then the board snapshot. If Matt then wants to work one of them, suggest its story chat.

@@ -27,6 +27,29 @@ const id = (f) => v(f).replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-'); // 
 })
 ```
 
+### Story snapshot (one story in full)
+The board snapshot leaves out descriptions and acceptance criteria. Use this snapshot after you change a story (it
+counts as the resync for that change), and whenever you read a story's full details: the app then shows the
+current text and gives it to the builders. Set `N` to the story number.
+```js
+const N = 'STRY00xxxxx';
+const [s] = await SN(`/api/now/table/rm_story?sysparm_query=number=${N}&sysparm_display_value=all&sysparm_exclude_reference_link=true&sysparm_fields=sys_id,number,short_description,description,acceptance_criteria,state,priority,assigned_to,sprint,story_points,sys_updated_on`);
+const v = (f) => f?.value ?? '', d = (f) => f?.display_value ?? '';
+const id = (f) => v(f).replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-');
+// HTML → plain text, then 900-character pieces (the extension cuts strings over 1000 characters).
+const plain = (html) => { const el = document.createElement('div'); el.innerHTML = String(html).replace(/<(br|\/p|\/li|\/div)[^>]*>/gi, '\n$&'); return el.textContent.replace(/\n{3,}/g, '\n\n').trim(); };
+const pieces = (t) => t.match(/[\s\S]{1,900}/g) || [];
+({
+  __arco: 'story-v1',
+  sys_id: id(s.sys_id), number: v(s.number), title: d(s.short_description),
+  state_value: v(s.state), state_label: d(s.state), priority: d(s.priority), assigned_to: d(s.assigned_to),
+  sprint: d(s.sprint), points: d(s.story_points), updated: v(s.sys_updated_on),
+  tags: [...new Set(`${d(s.short_description)} ${d(s.description)}`.match(/#[A-Za-z][\w-]*/g) || [])],
+  description_parts: pieces(plain(v(s.description))),
+  acceptance_parts: pieces(plain(v(s.acceptance_criteria))),
+})
+```
+
 ### Timesheet snapshot (this week)
 ```js
 const sun = new Date(); sun.setDate(sun.getDate() - sun.getDay());

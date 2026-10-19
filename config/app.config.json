@@ -5,6 +5,7 @@
   "servicenow": {
     "instanceUrl": "https://arcoconstruction.service-now.com",
     "boardSysId": "423702ce837b0350cc2a47447daad34e",
+    "assignmentGroup": "d2ab7f44472d21102a2bef4d646d4329",
     "storyTable": "rm_story",
     "timesheetPortalUrl": "https://arcoconstruction.service-now.com/tcp?sysparm_domain_restore=false&sysparm_stack=no",
     "routingTags": {

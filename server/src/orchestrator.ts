@@ -7,7 +7,7 @@ import { finishRun, isRunActive, runClaude, type StreamMessage } from './claude/
 import { query, queryOne } from './db/index.js';
 import { addEvent, createRun, type RunKind } from './runs.js';
 import { findMarked, resultTexts, withChrome } from './servicenow/chrome.js';
-import { saveBoardSnapshot, saveTimesheetSnapshot, type BoardSnapshot, type TimesheetSnapshot } from './servicenow/store.js';
+import { saveBoardSnapshot, saveStorySnapshot, saveTimesheetSnapshot, type BoardSnapshot, type StorySnapshot, type TimesheetSnapshot } from './servicenow/store.js';
 
 export interface Conversation {
   id: string;
@@ -155,12 +155,14 @@ function captureSnapshots(runId: string) {
     for (const block of msg.message.content) {
       if (block.type !== 'tool_result') continue;
       for (const text of resultTexts(block)) {
-        const snap = findMarked<BoardSnapshot | TimesheetSnapshot>(text, ['board-v2', 'timesheet-v2']);
+        const snap = findMarked<BoardSnapshot | TimesheetSnapshot | StorySnapshot>(text, ['board-v2', 'timesheet-v2', 'story-v1']);
         if (!snap) continue;
         const save =
           snap.__arco === 'board-v2'
             ? saveBoardSnapshot(snap).then((n) => `Saved board snapshot (${n} stories)`)
-            : saveTimesheetSnapshot(snap).then((n) => `Saved timesheet snapshot (${n} rows)`);
+            : snap.__arco === 'story-v1'
+              ? saveStorySnapshot(snap).then((n) => `Saved story snapshot (${n})`)
+              : saveTimesheetSnapshot(snap).then((n) => `Saved timesheet snapshot (${n} rows)`);
         void save
           .then((note) => addEvent(runId, 'saved', note))
           .then(() => publish('board', { syncedAt: new Date().toISOString() }))

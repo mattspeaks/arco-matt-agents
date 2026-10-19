@@ -1,6 +1,6 @@
 ---
 name: servicenow
-description: Read and update Matt's ServiceNow work through Claude in Chrome. Covers the ABS Data and Analytics VTB (rm_story stories, lanes, work notes) and Matt's own timesheet (time_sheet / time_card hours). Use whenever Matt asks what's on the board or in a lane, about a STRY number, about his hours, or wants to create a story (including turning notes or a conversation into stories), move a card, add a work note, or log or change time. Also use it to refresh the app's board and timesheet copy.
+description: Read and update Matt's ServiceNow work through Claude in Chrome. Covers the ABS Data and Analytics VTB (rm_story stories, lanes, work notes) and Matt's own timesheet (time_sheet / time_card hours). Use whenever Matt asks what's on the board or in a lane, about a STRY number, about his hours, or wants to create a story (including turning notes or a conversation into stories), edit a story (title, description, acceptance criteria, points, priority, assignee, sprint, epic), move a card, add a work note, or log or change time. Also use it to refresh the app's board and timesheet copy.
 ---
 # ServiceNow (ABS Data and Analytics board + Matt's timesheet)
 
@@ -69,8 +69,8 @@ window.SN = async (path, opts = {}) => {
   clicks Approve, his next message is "Yes, go ahead: …", and only that turn can write: the app's guard blocks
   writes anywhere else, including after a typed "yes". If he rejects, or anything changes, prepare a new preview.
   One card can cover a batch.
-- **Always finish a write by re-running the matching snapshot** from `references/reading.md`: the board after a
-  story change, the timesheet after an hours change. That's how the app's local copy updates. The app won't let the
+- **Always finish a write by re-running the matching snapshot** from `references/reading.md`: the story snapshot after a
+  story change (the board snapshot too if you created a story or changed a sprint), the timesheet after an hours change. That's how the app's local copy updates. The app won't let the
   turn end without it.
 - Never delete records. Never write to tables other than `rm_story` and `time_card`.
 - If API calls start failing with 401/403, tell Matt. Don't switch to clicking through the UI unless he asks.
@@ -79,7 +79,7 @@ window.SN = async (path, opts = {}) => {
 ## What to read next
 - Questions about the board, a story, or hours, or refreshing the app's copy: `references/reading.md`
 - Creating stories, including from notes or a conversation: `references/creating.md`
-- Moving a card, adding a work note, logging or changing hours: `references/writing.md`
+- Editing a story's fields, moving a card, adding a work note, logging or changing hours: `references/writing.md`
 
 ## Work note template (agent work)
 ```

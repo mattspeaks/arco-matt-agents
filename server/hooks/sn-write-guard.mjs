@@ -4,6 +4,7 @@
 //   - story state only to the allow-listed lanes (config: servicenow.agentAllowedStateValues); a new story may
 //     start only in servicenow.agentCreateStateValues, and is created in its own call
 //   - never change the time_sheet record or a time card's state (submitting is Matt's)
+//   - a story's assignment_group can only ever be the team's group (config: servicenow.assignmentGroup)
 //   - no form submits from script
 //   - only in the turn Matt started by clicking Approve on an approval card (asks the app: /api/agent/write_permit)
 // Exit 2 blocks the call and shows the reason to Claude. Reads pass straight through.
@@ -45,6 +46,12 @@ process.stdin.on('end', () => {
   if (/\/api\/now\/table\/time_sheet\//.test(code)) block('the time_sheet record itself is never changed (Matt submits)');
   // Lookup tables may be queried (?sysparm_query=...) in a write snippet, never addressed by record path.
   if (/\/api\/now\/table\/(task|sys_user)\//.test(code)) block('task and sys_user records are read-only');
+
+  // Stories stay on the team's board: assignment_group, if written at all, must be the team's group.
+  const team = String(config.servicenow.assignmentGroup ?? '');
+  for (const m of code.matchAll(/['"]?\bassignment_group['"]?\s*:\s*(['"`]?)([^'"`,}\s]*)\1/g)) {
+    if (tables.has('rm_story') && m[2].replace(/-/g, '') !== team) block(`stories stay in the ABS Data and Analytics group (write assignment_group only as the literal id ${team}); reassigning to another group is Matt's call`);
+  }
 
   // Creating a story: POST to the rm_story collection (no record id), kept apart from updates to existing stories.
   const creatingStory = writes.includes('POST') && /\/api\/now\/table\/rm_story(?![\/\w])/.test(code);

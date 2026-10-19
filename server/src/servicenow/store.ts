@@ -142,6 +142,16 @@ export interface BoardSnapshot {
     assigned_to: string; sprint: string; points: string; updated: string; tags: string[];
   }[];
 }
+/** One story in full (after an edit, or when reading a story): the only snapshot with description and criteria. */
+export interface StorySnapshot {
+  __arco: 'story-v1';
+  sys_id: string; number: string; title: string; state_value: string; state_label: string; priority: string;
+  assigned_to: string; sprint: string; points: string; updated: string; tags: string[];
+  // Plain text in pieces of at most 900 characters (the extension cuts longer strings).
+  description_parts: string[];
+  acceptance_parts: string[];
+}
+
 export interface TimesheetSnapshot {
   __arco: 'timesheet-v2';
   sheet: { sys_id: string; week_starts_on: string; week_ends_on: string; state: string; total_hours: number } | null;
@@ -189,6 +199,39 @@ export async function saveBoardSnapshot(p: BoardSnapshot): Promise<number> {
     [JSON.stringify(rows)],
   );
   return rows.length;
+}
+
+/** Saves one story in full. A text field the extension blanked keeps its previous value. */
+export async function saveStorySnapshot(p: StorySnapshot): Promise<string> {
+  if (!/^[A-Z]+\d+$/.test(p.number)) throw new Error(`Bad story number: ${p.number}`);
+  const text = (parts: string[] | undefined) => {
+    const joined = (parts ?? []).join('');
+    return /\[BLOCKED/.test(joined) ? null : joined;
+  };
+  const tags = p.tags ?? [];
+  const row = {
+    sys_id: snId(p.sys_id), number: p.number, title: p.title, description: text(p.description_parts), acceptance: text(p.acceptance_parts),
+    state_value: p.state_value, state_label: p.state_label, priority: p.priority, assigned_to: p.assigned_to, sprint: p.sprint,
+    points: p.points, updated: p.updated, tags: JSON.stringify(tags), domain: domainFor(tags),
+  };
+  await query(
+    `MERGE dbo.stories AS t
+     USING (SELECT * FROM OPENJSON(?) WITH (
+        sys_id CHAR(32), number NVARCHAR(40), title NVARCHAR(400), description NVARCHAR(MAX), acceptance NVARCHAR(MAX),
+        state_value NVARCHAR(40), state_label NVARCHAR(100), priority NVARCHAR(100), assigned_to NVARCHAR(200),
+        sprint NVARCHAR(200), points NVARCHAR(20), updated NVARCHAR(40), tags NVARCHAR(400), domain NVARCHAR(20))) AS s
+     ON t.number = s.number
+     WHEN MATCHED THEN UPDATE SET sys_id = COALESCE(s.sys_id, t.sys_id), short_description = s.title,
+        description = COALESCE(s.description, t.description), acceptance_criteria = COALESCE(s.acceptance, t.acceptance_criteria),
+        state_value = s.state_value, state_label = s.state_label, priority = s.priority, assigned_to = s.assigned_to,
+        sprint = s.sprint, story_points = s.points, tags = s.tags, domain = s.domain, sn_updated_on = s.updated, synced_at = SYSUTCDATETIME()
+     WHEN NOT MATCHED BY TARGET AND s.sys_id IS NOT NULL THEN INSERT (sys_id, number, short_description, description, acceptance_criteria,
+        state_value, state_label, priority, assigned_to, sprint, story_points, tags, domain, on_board, sn_updated_on)
+        VALUES (s.sys_id, s.number, s.title, s.description, s.acceptance, s.state_value, s.state_label, s.priority, s.assigned_to,
+        s.sprint, s.points, s.tags, s.domain, 0, s.updated);`,
+    [JSON.stringify([row])],
+  );
+  return p.number;
 }
 
 /** Saves a timesheet snapshot read by the orchestrator (replaces that week's rows). */

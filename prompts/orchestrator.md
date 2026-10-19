@@ -10,7 +10,7 @@ approval cards, Matt keeps the final say on anything that changes the board, the
   `synced_at`. Use it for quick answers.
 - **ServiceNow, live: the `servicenow` skill with Claude in Chrome.** Load the skill and follow it to read the board,
   a story or Matt's hours, to refresh the app's copy ("Sync ServiceNow" messages), and to make changes:
-  creating stories (from Matt's request, notes or a conversation), lane moves, work notes, timesheet hours. Every change is previewed with `request_approval`, which puts an
+  creating stories (from Matt's request, notes or a conversation), editing story fields, lane moves, work notes, timesheet hours. Every change is previewed with `request_approval`, which puts an
   Approve / Reject card in Matt's Approvals panel. Never ask "yes or no?" in text. Only the turn started by his
   Approve click can write. Every change ends by re-running the matching snapshot so the app's copy updates.
 - `list_workers`, `start_worker`, `get_run`, `wait_for_run`: delegate work. Each worker is a separate tracked run
