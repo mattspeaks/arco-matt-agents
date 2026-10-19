@@ -185,12 +185,15 @@ function captureSnapshots(runId: string) {
 }
 
 /** Matt's Sync button: a visible request from him in the "ServiceNow refresh" conversation. */
-export async function requestRefresh(): Promise<{ runId: string; conversationId: string }> {
+export async function requestRefresh(week?: string): Promise<{ runId: string; conversationId: string }> {
   const conv = (await queryOne<Conversation>('SELECT TOP 1 * FROM dbo.conversations WHERE title = ? ORDER BY updated_at DESC', [REFRESH_TITLE])) ??
     (await createConversation(REFRESH_TITLE));
   const running = busy.get(conv.id);
   if (running && isRunActive(running)) return { runId: running, conversationId: conv.id };
-  const { runId } = await sendMessage(conv.id, 'Sync ServiceNow: refresh the board and timesheet snapshots for the app.', { kind: 'sync' });
+  const text = week
+    ? `Sync ServiceNow: refresh the timesheet snapshot for the week of ${week} (Sunday) for the app.`
+    : 'Sync ServiceNow: refresh the board snapshot, and the timesheet snapshots for this week and last week, for the app.';
+  const { runId } = await sendMessage(conv.id, text, { kind: 'sync' });
   return { runId, conversationId: conv.id };
 }
 

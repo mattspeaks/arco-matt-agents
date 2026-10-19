@@ -308,3 +308,5 @@ pre.note {
 .final-qc { margin: 4px 0 8px; }
 .final-qc summary { cursor: pointer; }
 .final-qc .approval-preview { max-height: 320px; overflow: auto; }
+.ts-weeks { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 0; flex-wrap: wrap; }
+.week-switch { display: flex; gap: 4px; margin: 4px 0; }

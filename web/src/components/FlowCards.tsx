@@ -280,9 +280,16 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 
 /** Hours to add to a story's timesheet row, one box per day of the week. */
 export function TimeEntryCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
-  const p = parseJson<{ storyNumber?: string; weekStart?: string; logged?: Record<string, number> }>(approval.payload, {});
+  const raw = parseJson<{ storyNumber?: string; weekStart?: string; logged?: Record<string, number>; weeks?: { start: string; label: string; logged: Record<string, number> }[] }>(
+    approval.payload,
+    {},
+  );
+  const weeks = raw.weeks?.length ? raw.weeks : [{ start: raw.weekStart ?? '', label: 'This week', logged: raw.logged ?? {} }];
   const { busy, decide } = useDecide(approval, onError);
+  const [weekStart, setWeekStart] = useCardState(approval.id, 'weekStart', weeks[0].start);
   const [hours, setHours] = useCardState<Record<string, string>>(approval.id, 'hours', {});
+  const current = weeks.find((w) => w.start === weekStart) ?? weeks[0];
+  const p = { storyNumber: raw.storyNumber, weekStart: current.start, logged: current.logged };
   const start = p.weekStart ? new Date(`${p.weekStart}T00:00:00`) : new Date();
   const days = WEEKDAYS.map((key, i) => {
     const d = new Date(start);
@@ -307,6 +314,15 @@ export function TimeEntryCard({ approval, onError }: { approval: Approval; onErr
       <div className="approval-title">{approval.title}</div>
       {approval.status === 'pending' ? (
         <>
+          {weeks.length > 1 && (
+            <div className="week-switch" role="tablist" aria-label="Week">
+              {weeks.map((w) => (
+                <button key={w.start} role="tab" aria-selected={w.start === current.start} className={`btn small ${w.start === current.start ? 'primary' : 'ghost'}`} onClick={() => setWeekStart(w.start)}>
+                  {w.label}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="small muted">Hours to add for {p.storyNumber}, in quarter hours. What's already logged against it is under each day.</p>
           <div className="time-grid">
             {days.map((d) => (
@@ -334,7 +350,7 @@ export function TimeEntryCard({ approval, onError }: { approval: Approval; onErr
             {invalid && <span className="err"> · Use quarter hours, and keep each day at 24h or less</span>}
           </div>
           <div className="approval-actions">
-            <button className="btn primary" disabled={busy || invalid || total <= 0} onClick={() => void decide(true, { hours: parsed })}>
+            <button className="btn primary" disabled={busy || invalid || total <= 0} onClick={() => void decide(true, { hours: parsed, weekStart: current.start })}>
               Add to timesheet
             </button>
             <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>

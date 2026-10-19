@@ -136,4 +136,8 @@ export const SCHEMA: string[] = [
      created_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
      updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
    )`,
+
+  // Early syncs stored timesheets whose id the Chrome extension had blanked; drop them and their rows.
+  `DELETE FROM dbo.time_cards WHERE time_sheet_id LIKE '%[^0-9a-f]%' OR time_sheet_id IN (SELECT sys_id FROM dbo.timesheets WHERE sys_id LIKE '%[^0-9a-f]%')`,
+  `DELETE FROM dbo.timesheets WHERE sys_id LIKE '%[^0-9a-f]%'`,
 ];

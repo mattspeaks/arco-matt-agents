@@ -9,7 +9,7 @@ import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, op
 import { proposeLesson } from './lessons.js';
 import { createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
-import { getCurrentTimesheet, getLanes, getStory, lastSyncAt, listStories } from './servicenow/store.js';
+import { getCurrentTimesheet, getLanes, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
 
@@ -50,11 +50,19 @@ app.get('/api/board', async () => {
   return { stories, lanes, syncedAt, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl };
 });
 
-app.get('/api/timesheet', async () => getCurrentTimesheet());
+const WEEK = /^\d{4}-\d{2}-\d{2}$/;
+app.get<{ Querystring: { week?: string } }>('/api/timesheet', async (req) => {
+  if (req.query.week && !WEEK.test(req.query.week)) throw bad('week must be YYYY-MM-DD');
+  return getTimesheet(req.query.week);
+});
 
 // Matt's Sync button: posts a visible request from him into the "ServiceNow refresh" chat, and the orchestrator
 // reads the board and timesheet there. Nothing reads ServiceNow without a message from Matt.
-app.post('/api/sync', async () => requestRefresh());
+app.post<{ Body: { week?: string } }>('/api/sync', async (req) => {
+  const week = req.body?.week;
+  if (week && !WEEK.test(week)) throw bad('week must be YYYY-MM-DD');
+  return requestRefresh(week);
+});
 
 app.get<{ Querystring: { limit?: string } }>('/api/runs', async (req) => listRuns(Number(req.query.limit ?? 60)));
 
@@ -76,10 +84,10 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number> } }>(
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string } }>(
   '/api/approvals/:id/decision',
   async (req) =>
-    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours }),
+    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart }),
 );
 
 // ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------

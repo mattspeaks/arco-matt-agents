@@ -82,7 +82,7 @@ export async function decide(
   id: string,
   approve: boolean,
   note?: string,
-  extra: { workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number> } = {},
+  extra: { workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string } = {},
 ): Promise<Approval> {
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');
@@ -90,7 +90,7 @@ export async function decide(
 
   if (approval.kind === 'time_entry') {
     const { decideTimeEntry } = await import('./timesheet.js');
-    const outcome = await decideTimeEntry(approval, approve, extra.hours);
+    const outcome = await decideTimeEntry(approval, approve, extra.hours, extra.weekStart);
     await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [approve ? 'approved' : 'rejected', note, outcome, id]);
     const updated = (await getApproval(id))!;
     publish('approval', updated);

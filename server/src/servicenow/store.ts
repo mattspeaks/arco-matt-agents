@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { query, queryOne } from '../db/index.js';
 
+// Sheet ids the extension blanked ("[BLOCKED: …]") were stored by early syncs; only real 32-hex ids count.
+const VALID_SHEET = "sys_id NOT LIKE '%[^0-9a-f]%'";
+
 export interface SyncPayload {
   errors: string[];
   board: { name: string; filter: string };
@@ -239,7 +242,7 @@ export async function saveTimesheetSnapshot(p: TimesheetSnapshot): Promise<numbe
   if (!p.sheet) return 0;
   // A blanked sheet id falls back to the stored sheet for that week; blanked card ids get a local key
   // (the app only displays cards; changes are made live through the skill).
-  const known = await queryOne<{ sys_id: string }>('SELECT sys_id FROM dbo.timesheets WHERE week_starts_on = ?', [p.sheet.week_starts_on]);
+  const known = await queryOne<{ sys_id: string }>(`SELECT TOP 1 sys_id FROM dbo.timesheets WHERE week_starts_on = ? AND ${VALID_SHEET} ORDER BY synced_at DESC`, [p.sheet.week_starts_on]);
   const sheetId = snId(p.sheet.sys_id) ?? known?.sys_id;
   if (!sheetId) throw new Error('Timesheet snapshot has no usable sheet id');
   const cards = p.cards.map((c) => ({ ...c, sys_id: snId(c.sys_id) ?? randomUUID().replace(/-/g, '') }));
@@ -291,15 +294,24 @@ export async function stateValueFor(label: string): Promise<string | undefined> 
   return seen?.state_value;
 }
 
-export async function getCurrentTimesheet() {
+/** A week's timesheet from the app's copy (week = its Sunday, YYYY-MM-DD; default: the newest week synced). */
+export async function getTimesheet(week?: string) {
   const sheet = await queryOne<{ sys_id: string; week_starts_on: Date; week_ends_on: Date; state: string; total_hours: number; synced_at: string }>(
-    'SELECT TOP 1 * FROM dbo.timesheets ORDER BY week_starts_on DESC',
+    week
+      ? `SELECT TOP 1 * FROM dbo.timesheets WHERE week_starts_on = ? AND ${VALID_SHEET} ORDER BY synced_at DESC`
+      : `SELECT TOP 1 * FROM dbo.timesheets WHERE ${VALID_SHEET} ORDER BY week_starts_on DESC, synced_at DESC`,
+    week ? [week] : [],
   );
   const cards = sheet
     ? await query('SELECT * FROM dbo.time_cards WHERE time_sheet_id = ? ORDER BY category, task_number', [sheet.sys_id])
     : [];
-  return { sheet: sheet ?? null, cards };
+  const weeks = await query<{ w: string }>(
+    `SELECT DISTINCT TOP 12 CONVERT(varchar(10), week_starts_on, 23) AS w FROM dbo.timesheets WHERE ${VALID_SHEET} ORDER BY w DESC`,
+  );
+  return { sheet: sheet ?? null, cards, week: week ?? (sheet ? new Date(sheet.week_starts_on).toISOString().slice(0, 10) : null), weeks: weeks.map((r) => r.w) };
 }
+
+export const getCurrentTimesheet = () => getTimesheet();
 
 export async function markStoryState(sysId: string, stateValue: string, stateLabel: string) {
   await query('UPDATE dbo.stories SET state_value = ?, state_label = ?, synced_at = SYSUTCDATETIME() WHERE sys_id = ?', [

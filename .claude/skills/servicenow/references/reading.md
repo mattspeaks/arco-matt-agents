@@ -6,8 +6,9 @@ All snippets assume `window.SN` from SKILL.md is defined. Run them with `javascr
 
 The app keeps a local copy for its dashboard. It saves any `javascript_tool` result whose `__arco` field is
 `board-v2` or `timesheet-v2`, so return **exactly** these shapes and don't rename fields. Return `sys_id`s in the dashed form shown: the
-extension blanks bare 32-character IDs as "encoded data". Run both when Matt asks to
-sync or refresh, and after any write, so the dashboard shows the change. Fetch once and answer follow-up questions
+extension blanks bare 32-character IDs as "encoded data". When Matt asks to sync or refresh, run the board snapshot
+and the timesheet snapshot for this week and for last week. After any write, run the matching snapshot (for an
+hours change, the week you changed), so the dashboard shows the change. Fetch once and answer follow-up questions
 from the result.
 
 ### Board snapshot
@@ -50,10 +51,13 @@ const pieces = (t) => t.match(/[\s\S]{1,900}/g) || [];
 })
 ```
 
-### Timesheet snapshot (this week)
+### Timesheet snapshot (one week)
+Run it once per week. Each run returns its own snapshot, and the app keeps every week it has seen. **Sync** means
+this week and last week. For another week, Matt names it, or the sync message gives its Sunday as `W`.
 ```js
-const sun = new Date(); sun.setDate(sun.getDate() - sun.getDay());
-const W = sun.toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
+const WEEKS_BACK = 0; // 0 = this week, 1 = last week
+const sun = new Date(); sun.setDate(sun.getDate() - sun.getDay() - 7 * WEEKS_BACK);
+const W = sun.toLocaleDateString('en-CA'); // the week's Sunday, YYYY-MM-DD, local time (or set W directly)
 const [sheet] = await SN(`/api/now/table/time_sheet?sysparm_query=user=javascript:gs.getUserID()^week_starts_on=${W}&sysparm_fields=sys_id,week_starts_on,week_ends_on,state,total_hours&sysparm_display_value=all&sysparm_limit=1`);
 const cards = sheet ? await SN(`/api/now/table/time_card?sysparm_query=time_sheet=${sheet.sys_id.value}&sysparm_display_value=all&sysparm_exclude_reference_link=true&sysparm_limit=200&sysparm_fields=sys_id,task.number,task.short_description,task.sys_class_name,top_task,category,sunday,monday,tuesday,wednesday,thursday,friday,saturday,total,state`) : [];
 const v = (f) => f?.value ?? '', d = (f) => f?.display_value ?? '', n = (f) => +(f?.value ?? 0) || 0;

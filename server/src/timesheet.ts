@@ -45,10 +45,21 @@ export async function askTimeEntry(conversationId: string, story: string) {
     publish('approval', await getApproval(id));
   }
   const start = weekStart();
+  const last = weekStart(new Date(Date.now() - 7 * 86_400_000));
   const approval = await createApproval({
     kind: 'time_entry',
-    title: `${story}: add time to this week's timesheet`,
-    payload: { conversationId, storyNumber: story, weekStart: start, logged: await loggedThisWeek(story, start) },
+    title: `${story}: add time to your timesheet`,
+    payload: {
+      conversationId,
+      storyNumber: story,
+      weekStart: start,
+      logged: await loggedThisWeek(story, start),
+      // The card can switch to last week (e.g. a forgotten Friday).
+      weeks: [
+        { start, label: 'This week', logged: await loggedThisWeek(story, start) },
+        { start: last, label: 'Last week', logged: await loggedThisWeek(story, last) },
+      ],
+    },
     requestedByRunId: null,
   });
   await postApprovalCard(conversationId, approval.id);
@@ -56,9 +67,18 @@ export async function askTimeEntry(conversationId: string, story: string) {
 }
 
 /** Matt's answer. Add: validate the hours and ask the chat to add them (that turn may write). Skip: nothing. */
-export async function decideTimeEntry(approval: Approval, approve: boolean, hours: Record<string, number> = {}): Promise<string> {
+export async function decideTimeEntry(approval: Approval, approve: boolean, hours: Record<string, number> = {}, week?: string): Promise<string> {
   if (!approve) return 'Skipped';
-  const p = JSON.parse(approval.payload) as { conversationId: string; storyNumber: string; weekStart: string; logged?: Partial<Record<Day, number>> };
+  const raw = JSON.parse(approval.payload) as {
+    conversationId: string;
+    storyNumber: string;
+    weekStart: string;
+    logged?: Partial<Record<Day, number>>;
+    weeks?: { start: string; logged: Partial<Record<Day, number>> }[];
+  };
+  const chosen = (week && raw.weeks?.find((w) => w.start === week)) || { start: raw.weekStart, logged: raw.logged };
+  if (week && chosen.start !== week) throw new Error(`The card only covers this week and last week`);
+  const p = { ...raw, weekStart: chosen.start, logged: chosen.logged };
   const entries: { i: number; day: Day; add: number }[] = [];
   for (const [i, day] of DAYS.entries()) {
     const add = Number(hours[day] ?? 0);

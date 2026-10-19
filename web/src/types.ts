@@ -50,6 +50,9 @@ export interface TimeCard {
 export interface Timesheet {
   sheet: { sys_id: string; week_starts_on: string; week_ends_on: string; state: string; total_hours: number; synced_at: string } | null;
   cards: TimeCard[];
+  /** The week shown (its Sunday, YYYY-MM-DD), and every week the app has a copy of. */
+  week?: string | null;
+  weeks?: string[];
 }
 
 export type RunStatus = 'queued' | 'awaiting_approval' | 'running' | 'succeeded' | 'failed' | 'cancelled';

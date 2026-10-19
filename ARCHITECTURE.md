@@ -224,11 +224,15 @@ Needs:     <decision or approval required from Matt>
 ### 4.5 Timesheet
 
 `time_sheet` holds one row per user per week (weeks start Sunday). `time_card` holds one row per task per week,
-with `sunday`…`saturday`, `total`, `category`, `task` and `top_task`. The sync pulls the current week. The UI
-shows it and puts each story's hours next to its card, and the orchestrator can read it with `get_timesheet`.
+with `sunday`…`saturday`, `total`, `category`, `task` and `top_task`. Sync reads this week and last week, and the
+app keeps every week it has read. The Timesheet tab switches between **This week** and **Last week**, and can refresh
+either one. Story cards show this week's hours, and the orchestrator can read the timesheet with `get_timesheet`.
 
-The orchestrator reads and changes hours with the `servicenow` skill (`references/writing.md`), previewed in chat
-and confirmed by Matt's "yes". Each entry sets one day's total for one row: a story or task, or a category such
+The **Timesheet card** (`time_entry`) logs hours for a story. It has a box per day for this week or last week, with
+what's already logged on the story shown, and Matt's Add click starts the chat turn that writes them.
+
+The orchestrator reads and changes hours with the `servicenow` skill (`references/writing.md`), previewed on an
+approval card (or entered on the Timesheet card) and written only in the turn Matt's click starts. Each entry sets one day's total for one row: a story or task, or a category such
 as Admin or Meeting. Guardrails:
 - Matt's own timesheet only.
 - Pending sheets only.

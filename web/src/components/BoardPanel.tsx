@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { DAYS, type Board, type Story, type Timesheet } from '../types';
-import { parseJson } from '../api';
+import { api, parseJson } from '../api';
 
 const COLLAPSED_BY_DEFAULT = ['Complete', 'Cancelled', 'Draft'];
 
@@ -103,18 +103,75 @@ export function BoardPanel({ board, timesheet, onOpenStory }: { board: Board | n
   );
 }
 
+/** A week's Sunday, YYYY-MM-DD, in local time (timesheet weeks start on Sunday). */
+function sundayOf(weeksBack: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay() - 7 * weeksBack);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function TimesheetView({ timesheet }: { timesheet: Timesheet | null }) {
-  if (!timesheet?.sheet) return <p className="muted pad">No timesheet synced for this week yet.</p>;
-  const { sheet, cards } = timesheet;
+  const [weeksBack, setWeeksBack] = useState(0); // 0 = this week, 1 = last week
+  const [shown, setShown] = useState<Timesheet | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const week = sundayOf(weeksBack);
+
+  // Re-read whenever the app's copy changes (App re-fetches the current timesheet after every sync).
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    api<Timesheet>(`/api/timesheet?week=${week}`)
+      .then((t) => live && setShown(t))
+      .catch(() => live && setShown(null))
+      .finally(() => live && setLoading(false));
+    setSyncing(false);
+    return () => {
+      live = false;
+    };
+  }, [week, timesheet]);
+
+  const refresh = () => {
+    setSyncing(true);
+    void api('/api/sync', { body: { week } }).catch(() => setSyncing(false));
+  };
+
+  const switcher = (
+    <div className="ts-weeks">
+      <div className="tabs small" role="tablist" aria-label="Week">
+        {['This week', 'Last week'].map((label, i) => (
+          <button key={label} role="tab" aria-selected={weeksBack === i} className={weeksBack === i ? 'tab active' : 'tab'} onClick={() => setWeeksBack(i)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button className="btn ghost small" disabled={syncing} onClick={refresh} title={`Ask the orchestrator to re-read the week of ${week} from ServiceNow`}>
+        {syncing ? 'Refreshing…' : 'Refresh this week'}
+      </button>
+    </div>
+  );
+
+  if (!shown?.sheet)
+    return (
+      <div className="panel-body">
+        {switcher}
+        <p className="muted pad">
+          {loading ? 'Loading…' : `The app has no copy of the week of ${week} yet. Use Refresh to read it from ServiceNow.`}
+        </p>
+      </div>
+    );
+  const { sheet, cards } = shown;
   const totals = DAYS.map((d) => cards.reduce((s, c) => s + Number(c[d] || 0), 0));
   return (
     <div className="panel-body">
+      {switcher}
       <div className="ts-head">
         <div>
           <div className="small muted">Week of</div>
           <div className="strong">{String(sheet.week_starts_on).slice(0, 10)}</div>
         </div>
         <span className="tag subtle">{sheet.state}</span>
+        <div className="small muted">synced {new Date(sheet.synced_at).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
         <div className="push strong">{Number(sheet.total_hours)}h</div>
       </div>
       <table className="ts-table">
@@ -153,7 +210,7 @@ function TimesheetView({ timesheet }: { timesheet: Timesheet | null }) {
           </tr>
         </tfoot>
       </table>
-      <p className="small muted pad">Read-only for now. Agents can see this, but can't log time.</p>
+      <p className="small muted pad">To log time, ask the orchestrator, or use the Timesheet card in a story chat. Every change goes through a card.</p>
     </div>
   );
 }
