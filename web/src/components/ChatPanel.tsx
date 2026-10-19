@@ -42,6 +42,7 @@ export function ChatPanel({
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
   const open = conversations.filter((c) => !c.archived_at);
+  const [closeoutOpen, setCloseoutOpen] = useState(false);
   const archived = conversations.filter((c) => c.archived_at);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function ChatPanel({
     }
     setMessages([]);
     setPendingRunId(null);
+    setCloseoutOpen(false);
     if (!activeId) return;
     void api<ChatMessage[]>(`/api/conversations/${activeId}/messages`)
       .then((ms) => {
@@ -164,7 +166,35 @@ export function ChatPanel({
             {active.archived_at ? 'Reopen' : 'Archive'}
           </button>
         )}
+        {active?.story_number && (
+          <button
+            className={`btn ${active.closeout && !active.closeout.closed ? 'closeout-btn' : 'ghost'} ${closeoutOpen ? 'active' : ''}`}
+            aria-expanded={closeoutOpen}
+            title="Your close-out checklist for this story"
+            onClick={() => setCloseoutOpen((o) => !o)}
+          >
+            {!active.closeout ? 'Close-out' : active.closeout.closed ? '✓ Closed' : `Close-out ${active.closeout.done}/${active.closeout.total}`}
+          </button>
+        )}
       </div>
+      {closeoutOpen && active?.story_number && (
+        <div className="closeout-pop" role="dialog" aria-label={`Close-out for ${active.story_number}`}>
+          <button className="btn ghost closeout-pop-close" aria-label="Close" onClick={() => setCloseoutOpen(false)}>
+            ✕
+          </button>
+          {active.closeout ? (
+            <CloseoutCard story={active.story_number} onError={onError} />
+          ) : (
+            <div className="approval closeout">
+              <div className="approval-kind small">Close-out</div>
+              <p className="small muted">Your definition of done for {active.story_number}. It starts on its own after a publish, or start it now.</p>
+              <button className="btn primary" onClick={() => void api(`/api/stories/${active.story_number}/checklist`, { body: {} }).catch((e) => onError((e as Error).message))}>
+                Start close-out checklist
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {active?.archived_at && <div className="archived-banner small">Archived. Sending a message reopens this chat.</div>}
 
       <div className="panel-body chat-list" ref={listRef}>
@@ -176,9 +206,14 @@ export function ChatPanel({
         )}
         {messages.map((m) => {
           if (m.role === 'checklist') {
+            // The checklist itself lives behind the Close-out button in the header, so it can't scroll away.
             return (
-              <div key={m.id} className="chat-card">
-                <CloseoutCard story={m.content} onError={onError} />
+              <div key={m.id} className="approval-note small">
+                Close-out checklist started for {m.content}.{' '}
+                <button className="link small" onClick={() => setCloseoutOpen(true)}>
+                  Open it
+                </button>{' '}
+                (or use Close-out at the top).
               </div>
             );
           }
