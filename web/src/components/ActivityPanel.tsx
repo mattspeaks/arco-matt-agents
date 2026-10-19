@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { api, fmtDuration, fmtTime, parseJson } from '../api';
+import { fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
-import { PublishCard, ReviewCard, TimeEntryCard } from './FlowCards';
+import { PublishCard, ReviewCard, TimeEntryCard, useDecide } from './FlowCards';
+import { useCardState } from '../cardState';
 
 const KIND_LABEL: Record<Run['kind'], string> = { sync: 'Sync', orchestrator: 'Chat', worker: 'Worker', sn_write: 'SN write' };
 
@@ -111,19 +111,11 @@ export function ApprovalCard({ approval, onError }: { approval: Approval; onErro
 }
 
 function BasicApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
+  // Shared with the other copy of this card (chat / Approvals panel): see cardState.ts.
+  const [note, setNote] = useCardState(approval.id, 'note', '');
+  const { busy, decide: send } = useDecide(approval, onError);
   const p = parseJson<Record<string, string | undefined>>(approval.payload, {});
-
-  const decide = async (approve: boolean) => {
-    setBusy(true);
-    try {
-      await api(`/api/approvals/${approval.id}/decision`, { body: { approve, note: note || undefined } });
-    } catch (e) {
-      onError((e as Error).message);
-      setBusy(false);
-    }
-  };
+  const decide = (approve: boolean) => send(approve, { note });
 
   return (
     <div className={`approval ${approval.kind}`}>

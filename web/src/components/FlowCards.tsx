@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, parseJson } from '../api';
 import type { Approval } from '../types';
+import { getCardValue, loadOnce, setCardValue, useCardState } from '../cardState';
 
 // Cards for the Power BI report workflow that need more than Approve / Reject: the Review card (open in Desktop,
-// then Approve or Not ready) and the Publish card (workspace dropdown).
+// then Approve or Not ready) and the Publish card (workspace dropdown). Their state is shared (cardState.ts), so the
+// copy in the chat and the copy in Approvals always match.
 
-function useDecide(approval: Approval, onError: (m: string) => void) {
-  const [busy, setBusy] = useState(false);
+export function useDecide(approval: Approval, onError: (m: string) => void) {
+  const [busy, setBusy] = useCardState(approval.id, 'busy', false);
   const decide = async (approve: boolean, extra: { note?: string } & Record<string, unknown> = {}) => {
     setBusy(true);
     try {
@@ -34,10 +36,10 @@ function Decided({ approval, label }: { approval: Approval; label: string }) {
 export function ReviewCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const p = parseJson<Record<string, string>>(approval.payload, {});
   const { busy, decide } = useDecide(approval, onError);
-  const [opened, setOpened] = useState(false);
-  const [opening, setOpening] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
-  const [note, setNote] = useState('');
+  const [opened, setOpened] = useCardState(approval.id, 'opened', false);
+  const [opening, setOpening] = useCardState(approval.id, 'opening', false);
+  const [info, setInfo] = useCardState<string | null>(approval.id, 'info', null);
+  const [note, setNote] = useCardState(approval.id, 'note', '');
 
   const open = async () => {
     setOpening(true);
@@ -118,41 +120,44 @@ const BAD_NAME = /[<>:"/\\|?*]/;
 export function PublishCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const p = parseJson<Record<string, string>>(approval.payload, {});
   const { busy, decide } = useDecide(approval, onError);
-  const [targets, setTargets] = useState<Target[] | null>(null);
-  const [suggested, setSuggested] = useState('');
-  const [repoName, setRepoName] = useState(p.reportName ?? '');
-  const [workspaceId, setWorkspaceId] = useState('');
-  const [reports, setReports] = useState<ReportOption[] | null>(null);
-  const [reportId, setReportId] = useState(''); // '' = create a new report
-  const [name, setName] = useState(p.reportName ?? '');
+  const id = approval.id;
+  const [targets] = useCardState<Target[] | null>(id, 'targets', null);
+  const [suggested] = useCardState(id, 'suggested', '');
+  const [repoName] = useCardState(id, 'repoName', p.reportName ?? '');
+  const [workspaceId] = useCardState(id, 'workspaceId', '');
+  const [reports] = useCardState<ReportOption[] | null>(id, 'reports', null);
+  const [reportId, setReportId] = useCardState(id, 'reportId', ''); // '' = create a new report
+  const [name, setName] = useCardState(id, 'name', p.reportName ?? '');
   const pending = approval.status === 'pending';
+  const story = encodeURIComponent(p.storyNumber ?? '');
+
+  // Picking a workspace (by hand, or the suggestion on first load) loads its reports and pre-selects the one this
+  // story's report should update. Only a real pick resets the report and name, never a second copy of the card.
+  const selectWorkspace = (wsId: string) => {
+    setCardValue(id, 'workspaceId', wsId);
+    setCardValue<ReportOption[] | null>(id, 'reports', null);
+    if (!wsId) return;
+    loadOnce(`${id}:reports:${wsId}`, () => api<{ reports: ReportOption[]; match: string; repoName: string }>(`/api/fabric/workspaces/${wsId}/reports?story=${story}`))
+      .then((r) => {
+        if (getCardValue(id, 'workspaceId', '') !== wsId) return; // picked another meanwhile
+        setCardValue(id, 'reports', r.reports);
+        setCardValue(id, 'reportId', r.match);
+        setCardValue(id, 'name', r.reports.find((x) => x.id === r.match)?.name ?? r.repoName);
+      })
+      .catch((e) => onError(`Couldn't list reports: ${(e as Error).message}`));
+  };
 
   useEffect(() => {
     if (!pending) return;
-    api<{ workspaces: Target[]; suggested?: string; repoName?: string }>(`/api/fabric/workspaces?story=${encodeURIComponent(p.storyNumber ?? '')}`)
-      .then((r) => {
-        setTargets(r.workspaces);
-        setSuggested(r.suggested ?? '');
-        if (r.repoName) setRepoName(r.repoName);
-        setWorkspaceId((id) => id || r.suggested || '');
-      })
-      .catch((e) => onError(`Couldn't list workspaces: ${(e as Error).message}`));
+    void loadOnce(`${id}:init`, async () => {
+      const r = await api<{ workspaces: Target[]; suggested?: string; repoName?: string }>(`/api/fabric/workspaces?story=${story}`);
+      setCardValue(id, 'targets', r.workspaces);
+      setCardValue(id, 'suggested', r.suggested ?? '');
+      if (r.repoName) setCardValue(id, 'repoName', r.repoName);
+      if (!getCardValue(id, 'workspaceId', '') && r.suggested) selectWorkspace(r.suggested);
+    }).catch((e) => onError(`Couldn't list workspaces: ${(e as Error).message}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, p.storyNumber]);
-
-  // Picking a workspace loads its reports and pre-selects the one this story's report should update.
-  useEffect(() => {
-    if (!pending || !workspaceId) return;
-    setReports(null);
-    api<{ reports: ReportOption[]; match: string; repoName: string }>(`/api/fabric/workspaces/${workspaceId}/reports?story=${encodeURIComponent(p.storyNumber ?? '')}`)
-      .then((r) => {
-        setReports(r.reports);
-        setReportId(r.match);
-        setName(r.reports.find((x) => x.id === r.match)?.name ?? r.repoName);
-      })
-      .catch((e) => onError(`Couldn't list reports: ${(e as Error).message}`));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pending, workspaceId, p.storyNumber]);
+  }, [pending, id]);
 
   const target = reports?.find((r) => r.id === reportId);
   const trimmed = name.trim();
@@ -180,7 +185,7 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
           <label className="small muted" htmlFor={`ws-${approval.id}`}>
             Workspace
           </label>
-          <select id={`ws-${approval.id}`} className="input select-full" value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)} disabled={!targets}>
+          <select id={`ws-${approval.id}`} className="input select-full" value={workspaceId} onChange={(e) => selectWorkspace(e.target.value)} disabled={!targets}>
             {!targets && <option value="">Loading workspaces…</option>}
             {targets && <option value="">Choose a workspace…</option>}
             {targets?.map((w) => (
@@ -277,7 +282,7 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 export function TimeEntryCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   const p = parseJson<{ storyNumber?: string; weekStart?: string; logged?: Record<string, number> }>(approval.payload, {});
   const { busy, decide } = useDecide(approval, onError);
-  const [hours, setHours] = useState<Record<string, string>>({});
+  const [hours, setHours] = useCardState<Record<string, string>>(approval.id, 'hours', {});
   const start = p.weekStart ? new Date(`${p.weekStart}T00:00:00`) : new Date();
   const days = WEEKDAYS.map((key, i) => {
     const d = new Date(start);
