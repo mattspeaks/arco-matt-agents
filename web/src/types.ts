@@ -27,6 +27,8 @@ export interface Board {
   syncedAt: string | null;
   laneMapping: { ready: string; agentInProgress: string; agentReview: string };
   instanceUrl: string;
+  /** Matt's name as it appears in assigned_to. */
+  me?: string;
 }
 
 export interface TimeCard {

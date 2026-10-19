@@ -3,6 +3,17 @@ import { DAYS, type Board, type Story, type Timesheet } from '../types';
 import { api, parseJson } from '../api';
 
 const COLLAPSED_BY_DEFAULT = ['Complete', 'Cancelled', 'Draft'];
+const PERSON_KEY = 'arco.boardPerson';
+const EVERYONE = '';
+const UNASSIGNED = '__unassigned__';
+
+function loadPerson(): string {
+  try {
+    return localStorage.getItem(PERSON_KEY) ?? EVERYONE;
+  } catch {
+    return EVERYONE;
+  }
+}
 
 export function hoursFor(number: string, timesheet: Timesheet | null): number {
   return (timesheet?.cards ?? [])
@@ -14,6 +25,28 @@ export function BoardPanel({ board, timesheet, onOpenStory }: { board: Board | n
   const [tab, setTab] = useState<'board' | 'time'>('board');
   const [queueOnly, setQueueOnly] = useState(false);
   const [search, setSearch] = useState('');
+  const [person, setPersonState] = useState(loadPerson);
+  const setPerson = (p: string) => {
+    setPersonState(p);
+    try {
+      localStorage.setItem(PERSON_KEY, p);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+
+  // Everyone with a story on the board, most stories first, with Matt pulled out as "Me".
+  const people = useMemo(() => {
+    const counts = new Map<string, number>();
+    let unassigned = 0;
+    for (const s of board?.stories ?? []) {
+      const who = s.assigned_to?.trim();
+      if (who) counts.set(who, (counts.get(who) ?? 0) + 1);
+      else unassigned++;
+    }
+    const others = [...counts.entries()].filter(([name]) => name !== board?.me).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    return { me: board?.me ? (counts.get(board.me) ?? 0) : 0, others, unassigned };
+  }, [board]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set(COLLAPSED_BY_DEFAULT));
 
   const byLane = useMemo(() => {
@@ -22,13 +55,14 @@ export function BoardPanel({ board, timesheet, onOpenStory }: { board: Board | n
     const q = search.trim().toLowerCase();
     for (const s of board?.stories ?? []) {
       if (queueOnly && !s.domain) continue;
+      if (person === UNASSIGNED ? s.assigned_to?.trim() : person !== EVERYONE && s.assigned_to?.trim() !== person) continue;
       if (q && !`${s.number} ${s.short_description} ${s.assigned_to}`.toLowerCase().includes(q)) continue;
       const lane = s.state_label ?? 'Unknown';
       if (!groups.has(lane)) groups.set(lane, []);
       groups.get(lane)!.push(s);
     }
     return groups;
-  }, [board, queueOnly, search]);
+  }, [board, queueOnly, search, person]);
 
   const toggle = (lane: string) =>
     setCollapsed((c) => {
@@ -57,6 +91,17 @@ export function BoardPanel({ board, timesheet, onOpenStory }: { board: Board | n
         <>
           <div className="board-filters">
             <input className="input" placeholder="Search stories…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <select className={`input person-filter ${person ? 'active' : ''}`} value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Assigned to">
+              <option value={EVERYONE}>Everyone</option>
+              {board?.me && <option value={board.me}>Me ({people.me})</option>}
+              {people.others.map(([name, n]) => (
+                <option key={name} value={name}>
+                  {name} ({n})
+                </option>
+              ))}
+              {people.unassigned > 0 && <option value={UNASSIGNED}>Unassigned ({people.unassigned})</option>}
+              {person && person !== UNASSIGNED && person !== board?.me && !people.others.some(([n]) => n === person) && <option value={person}>{person} (0)</option>}
+            </select>
             <label className="check">
               <input type="checkbox" checked={queueOnly} onChange={(e) => setQueueOnly(e.target.checked)} /> Agent queue
             </label>

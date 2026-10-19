@@ -24,6 +24,8 @@ export interface AppConfig {
     boardSysId: string;
     /** The team's group (ABS Data and Analytics); stories are created in it and never moved out. */
     assignmentGroup: string;
+    /** Matt's name as ServiceNow shows it in assigned_to (the board's "Me" filter). */
+    myName: string;
     storyTable: string;
     timesheetPortalUrl: string;
     routingTags: Record<string, string[]>;

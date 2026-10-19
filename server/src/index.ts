@@ -47,7 +47,7 @@ app.get('/ws', { websocket: true }, (socket) => {
 // ---- UI API -------------------------------------------------------------------------------------
 app.get('/api/board', async () => {
   const [stories, lanes, syncedAt] = await Promise.all([listStories(), getLanes(), lastSyncAt()]);
-  return { stories, lanes, syncedAt, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl };
+  return { stories, lanes, syncedAt, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl, me: config.servicenow.myName };
 });
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
