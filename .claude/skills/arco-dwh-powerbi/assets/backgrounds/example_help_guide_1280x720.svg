@@ -1,0 +1,136 @@
+<svg viewBox="0 0 1280 720" width="1280" height="720" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>IT Timecard &amp; Capacity Analytics</title>
+<desc>A four-section quick-start reference for people managers covering the Time Card Summary, Time Card Details, Capacity &amp; Demand (IT Service Desk), and Team Accountability report pages, with the underlying timecard status color rules.</desc>
+<rect x="0" y="0" width="1280" height="720" fill="#0F2744"/>
+<text x="28" y="32" font-family="Arial" font-size="22" font-weight="700" fill="#ffffff">IT Timecard &amp; Capacity Analytics</text>
+<text x="28" y="50" font-family="Arial" font-size="11" font-weight="400" fill="#8AA0BC">Created by ABS Data &amp; Analytics Team</text>
+<rect x="1100" y="16" width="152" height="24" rx="12" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+<text x="1176" y="32" font-family="Arial" font-size="10.5" fill="#8AA0BC" text-anchor="middle">Quick-start reference</text>
+<line x1="28" y1="66" x2="1252" y2="66" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<text x="28" y="91" font-family="Arial" font-size="12" font-weight="700" fill="#8AA0BC">Status rules:</text>
+<g font-family="Arial" font-size="10.5" font-weight="400">
+<rect x="124" y="78" width="154" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="141" cy="90" r="5" fill="#94FF9D"/>
+<text x="154" y="94" fill="#C6D2E0">32+ hrs = submitted</text>
+<rect x="288" y="78" width="165" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="305" cy="90" r="5" fill="#F0E199"/>
+<text x="318" y="94" fill="#C6D2E0">1-31 hrs = incomplete</text>
+<rect x="462" y="78" width="132" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="479" cy="90" r="5" fill="#EFB5B9"/>
+<text x="492" y="94" fill="#C6D2E0">0 hrs = missing</text>
+<rect x="604" y="78" width="186" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="621" cy="90" r="5" fill="#C9B8F0"/>
+<text x="634" y="94" fill="#C6D2E0">45+ hrs = overtime review</text>
+<rect x="801" y="78" width="219" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="818" cy="90" r="5" fill="#7EB6F6"/>
+<text x="831" y="94" fill="#C6D2E0">Not past due until Sunday close</text>
+<rect x="1030" y="78" width="192" height="24" rx="12" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="1047" cy="90" r="5" fill="#93A5BD"/>
+<text x="1060" y="94" fill="#C6D2E0">Blank = not hired/departed</text>
+</g>
+<line x1="28" y1="108" x2="1252" y2="108" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<line x1="640" y1="108" x2="640" y2="696" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+<line x1="28" y1="410" x2="1252" y2="410" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+<g font-family="Arial">
+<rect x="28" y="122" width="136" height="22" rx="5" fill="rgba(24,95,165,0.25)" stroke="rgba(24,95,165,0.4)" stroke-width="1.5"/>
+<text x="96" y="137" font-size="11" font-weight="700" fill="#7EB6F6" text-anchor="middle">Time Card Summary</text>
+<text x="28" y="170" font-size="15" font-weight="700" fill="#ffffff">Portfolio view of your entire team's timecard health</text>
+<rect x="28" y="188" width="10" height="10" rx="2" fill="rgba(24,95,165,0.3)"/>
+<text x="46" y="197" font-size="11" font-weight="700" fill="#ffffff">KPI strip</text>
+<text x="46" y="211" font-size="10" fill="#B8C6D6">Total, Billable, Non-Billable &amp; Time Off Hours, Avg Hrs/Timesheet, Billable %, Associates Past Due.</text>
+<rect x="28" y="220" width="10" height="10" rx="2" fill="rgba(24,95,165,0.3)"/>
+<text x="46" y="229" font-size="11" font-weight="700" fill="#ffffff">Hours Logged Over Time &amp; By Category</text>
+<text x="46" y="243" font-size="10" fill="#B8C6D6">Monthly trend plus ranked breakdown of where time goes: Admin, Meetings, Enhancement, Demand, Training.</text>
+<rect x="28" y="252" width="10" height="10" rx="2" fill="rgba(24,95,165,0.3)"/>
+<text x="46" y="261" font-size="11" font-weight="700" fill="#ffffff">Heat map</text>
+<text x="46" y="275" font-size="10" fill="#B8C6D6">Every associate x every week, colored per the status rules; blank means not hired yet or departed.</text>
+<rect x="28" y="284" width="10" height="10" rx="2" fill="rgba(24,95,165,0.3)"/>
+<text x="46" y="293" font-size="11" font-weight="700" fill="#ffffff">Incomplete Timesheets table</text>
+<text x="46" y="307" font-size="10" fill="#B8C6D6">Everyone with a red or yellow week, ranked by weeks missing; filter by Leader to narrow to your team.</text>
+<rect x="28" y="326" width="580" height="48" fill="rgba(255,255,255,0.04)"/>
+<rect x="28" y="326" width="3" height="48" fill="rgba(255,255,255,0.2)"/>
+<text x="42" y="344" font-size="10" font-weight="700" fill="#B8C6D6">Tip:</text>
+<text x="66" y="344" font-size="10" fill="#9FB0C4">A high Associates Past Due count usually traces back to names already flagged below.</text>
+<text x="42" y="360" font-size="10" fill="#9FB0C4">Check the Incomplete Timesheets table before chasing the whole team.</text>
+</g>
+<g font-family="Arial">
+<rect x="670" y="122" width="136" height="22" rx="5" fill="rgba(83,74,183,0.25)" stroke="rgba(83,74,183,0.4)" stroke-width="1.5"/>
+<text x="738" y="137" font-size="11" font-weight="700" fill="#AFA9EC" text-anchor="middle">Time Card Details</text>
+<text x="670" y="170" font-size="15" font-weight="700" fill="#ffffff">Associate-level breakdown of how one person's time was spent</text>
+<rect x="670" y="188" width="10" height="10" rx="2" fill="rgba(83,74,183,0.3)"/>
+<text x="688" y="197" font-size="11" font-weight="700" fill="#ffffff">Associate &amp; Category filters</text>
+<text x="688" y="211" font-size="10" fill="#B8C6D6">Pick one associate, and optionally a category, to drill into their full week-by-week history.</text>
+<rect x="670" y="220" width="10" height="10" rx="2" fill="rgba(83,74,183,0.3)"/>
+<text x="688" y="229" font-size="11" font-weight="700" fill="#ffffff">KPI strip + weekly table</text>
+<text x="688" y="243" font-size="10" fill="#B8C6D6">Same metrics as the Summary page, scoped to the associate, plus their weekly hours below.</text>
+<rect x="670" y="252" width="10" height="10" rx="2" fill="rgba(83,74,183,0.3)"/>
+<text x="688" y="261" font-size="11" font-weight="700" fill="#ffffff">Ops / Incident / Request / Unallocated Hrs</text>
+<text x="688" y="275" font-size="10" fill="#B8C6D6">Unallocated = Ops Project Hrs minus Incident Hrs minus Request Hrs: time not tied to a ticket.</text>
+<rect x="670" y="284" width="10" height="10" rx="2" fill="rgba(83,74,183,0.3)"/>
+<text x="688" y="293" font-size="11" font-weight="700" fill="#ffffff">Projects Worked (Top 5)</text>
+<text x="688" y="307" font-size="10" fill="#B8C6D6">Donut chart of which projects hours were coded to; confirms time landed on the right project.</text>
+<rect x="670" y="326" width="580" height="48" fill="rgba(255,255,255,0.04)"/>
+<rect x="670" y="326" width="3" height="48" fill="rgba(255,255,255,0.2)"/>
+<text x="684" y="344" font-size="10" font-weight="700" fill="#B8C6D6">Tip:</text>
+<text x="708" y="344" font-size="10" fill="#9FB0C4">A large Unallocated Hrs number doesn't mean work didn't happen; it wasn't logged to a ticket.</text>
+<text x="684" y="360" font-size="10" fill="#9FB0C4">Coach the associate to code time to the incident or request, not just Ops.</text>
+</g>
+<g font-family="Arial">
+<rect x="28" y="424" width="136" height="22" rx="5" fill="rgba(15,110,86,0.25)" stroke="rgba(15,110,86,0.4)" stroke-width="1.5"/>
+<text x="96" y="439" font-size="11" font-weight="700" fill="#5DCAA5" text-anchor="middle">Capacity &amp; Demand</text>
+<text x="28" y="472" font-size="15" font-weight="700" fill="#ffffff">IT Service Desk ticket volume vs. staffing, by leader</text>
+<rect x="28" y="490" width="10" height="10" rx="2" fill="rgba(15,110,86,0.3)"/>
+<text x="46" y="499" font-size="11" font-weight="700" fill="#ffffff">KPI strip</text>
+<text x="46" y="513" font-size="10" fill="#B8C6D6">Active Associates, Total Tickets, Hours, Tickets/Week, Avg Hrs/Ticket, Implied FTEs, FTE Utilization.</text>
+<rect x="28" y="522" width="10" height="10" rx="2" fill="rgba(15,110,86,0.3)"/>
+<text x="46" y="531" font-size="11" font-weight="700" fill="#ffffff">Weekly Ticket Demand</text>
+<text x="46" y="545" font-size="10" fill="#B8C6D6">Projects ticket volume against the dashed Capacity line; watch for demand crossing above it.</text>
+<rect x="28" y="554" width="10" height="10" rx="2" fill="rgba(15,110,86,0.3)"/>
+<text x="46" y="563" font-size="11" font-weight="700" fill="#ffffff">Staffing By Leader &gt; Assignment Group</text>
+<text x="46" y="577" font-size="10" fill="#B8C6D6">Compares Actual FTEs to Implied FTEs Req'd by director and group; spots over/under-staffing.</text>
+<rect x="28" y="586" width="10" height="10" rx="2" fill="rgba(15,110,86,0.3)"/>
+<text x="46" y="595" font-size="11" font-weight="700" fill="#ffffff">Ticket Type Mix &amp; Top Categories</text>
+<text x="46" y="609" font-size="10" fill="#B8C6D6">Splits Catalog Task vs. Incident tickets; ranks categories driving the most tickets and hours.</text>
+<rect x="28" y="628" width="580" height="48" fill="rgba(255,255,255,0.04)"/>
+<rect x="28" y="628" width="3" height="48" fill="rgba(255,255,255,0.2)"/>
+<text x="42" y="646" font-size="10" font-weight="700" fill="#B8C6D6">Tip:</text>
+<text x="66" y="646" font-size="10" fill="#9FB0C4">Low FTE Utilization doesn't mean people are idle; cross-check it against Time Card Summary.</text>
+<text x="42" y="662" font-size="10" fill="#9FB0C4">Hours may be going to project work or admin, not tickets.</text>
+</g>
+<g font-family="Arial">
+<rect x="670" y="424" width="149" height="22" rx="5" fill="rgba(153,60,29,0.25)" stroke="rgba(153,60,29,0.4)" stroke-width="1.5"/>
+<text x="745" y="439" font-size="11" font-weight="700" fill="#F0997B" text-anchor="middle">Team Accountability</text>
+<text x="670" y="472" font-size="15" font-weight="700" fill="#ffffff">Timecard compliance by leader and team</text>
+<rect x="670" y="490" width="10" height="10" rx="2" fill="rgba(153,60,29,0.3)"/>
+<text x="688" y="499" font-size="11" font-weight="700" fill="#ffffff">Four buckets</text>
+<text x="688" y="513" font-size="10" fill="#B8C6D6">Submitted, Incomplete, Missing, Overtime Review: every associate lands in exactly one bucket.</text>
+<rect x="670" y="522" width="10" height="10" rx="2" fill="rgba(153,60,29,0.3)"/>
+<text x="688" y="531" font-size="11" font-weight="700" fill="#ffffff">Accountability Gap %</text>
+<text x="688" y="545" font-size="10" fill="#B8C6D6">= (Missing + Incomplete) / Total Associates for that team; flags who needs chasing.</text>
+<rect x="670" y="554" width="10" height="10" rx="2" fill="rgba(153,60,29,0.3)"/>
+<text x="688" y="563" font-size="11" font-weight="700" fill="#ffffff">Timecard Status By Team</text>
+<text x="688" y="577" font-size="10" fill="#B8C6D6">Stacked bar per team across all four buckets; spot the worst mix, not just the worst average.</text>
+<rect x="670" y="586" width="10" height="10" rx="2" fill="rgba(153,60,29,0.3)"/>
+<text x="688" y="595" font-size="11" font-weight="700" fill="#ffffff">Leader Action Required / Summary tables</text>
+<text x="688" y="609" font-size="10" fill="#B8C6D6">Sorted by Gap % descending; loop in the director whose team has the gap, not the associate.</text>
+<rect x="670" y="628" width="580" height="48" fill="rgba(255,255,255,0.04)"/>
+<rect x="670" y="628" width="3" height="48" fill="rgba(255,255,255,0.2)"/>
+<text x="684" y="646" font-size="10" font-weight="700" fill="#B8C6D6">Tip:</text>
+<text x="708" y="646" font-size="10" fill="#9FB0C4">Teams Out Of Compliance counts any team with at least one missing timecard.</text>
+<text x="684" y="662" font-size="10" fill="#9FB0C4">100% across all teams just means every team has one, not that all are failing broadly.</text>
+</g>
+<line x1="28" y1="696" x2="1252" y2="696" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<text x="28" y="712" font-family="Arial" font-size="10" fill="#7488A0">Data refreshes daily; check the top-right timestamp on each page.</text>
+<g font-family="Arial" font-size="10">
+<rect x="460" y="702" width="9" height="9" rx="2" fill="#94FF9D"/>
+<text x="474" y="710" fill="#8AA0BC">Submitted</text>
+<rect x="538.8" y="702" width="9" height="9" rx="2" fill="#F0E199"/>
+<text x="552.8" y="710" fill="#8AA0BC">Incomplete</text>
+<rect x="622.8" y="702" width="9" height="9" rx="2" fill="#EFB5B9"/>
+<text x="636.8" y="710" fill="#8AA0BC">Missing</text>
+<rect x="691.1999999999999" y="702" width="9" height="9" rx="2" fill="#C9B8F0"/>
+<text x="705.1999999999999" y="710" fill="#8AA0BC">Overtime review</text>
+<rect x="801.1999999999999" y="702" width="9" height="9" rx="2" fill="#93A5BD"/>
+<text x="815.1999999999999" y="710" fill="#8AA0BC">Not hired / departed</text>
+</g>
+</svg>

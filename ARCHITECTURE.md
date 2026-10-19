@@ -307,6 +307,17 @@ One workflow per story. It owns the story's branch, and it can change course at 
 If the server restarts in the middle of a step, the flow is marked failed. The orchestrator can rerun it with a
 rebuild card.
 
+### 5.3a House playbook and linter (`.claude/skills/arco-dwh-powerbi`, `server/src/pbi/lint.ts`)
+- The builder and QC follow the ABS Data & Analytics house playbook (`arco-dwh-powerbi`, vendored unmodified; see
+  its `VENDORED.md`). `.claude/skills/powerbi/SKILL.md` says how it applies to app agents, and where the app's rules
+  win: no publishing, no Desktop or screenshots, no DWH queries, repo worktrees instead of `C:\SNOW Logic`.
+- After every builder pass, and in the final QC, the app runs the playbook's `check_pbir.py` (read-only, about 2 s,
+  including Desktop's own TMDL parser) twice: on the branch, and on its starting point (exported with
+  `git archive`, following a renamed report). Only findings the branch introduced count. **Any new ERROR fails QC**,
+  whatever the QC run says, and goes back to the builder. The Review card shows the linter result, and the full
+  findings go in the QC report.
+- The builder may run the linter itself before committing (`Bash(py …check_pbir.py:*)`).
+
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:
 - **Close-out card.** After a publish, the story chat gets Matt's checklist. The default is in

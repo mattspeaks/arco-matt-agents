@@ -51,6 +51,7 @@
     "worktreeRoot": "C:/Users/mspeaks/source/repos/PowerBI-agent-worktrees",
     "baseBranch": null,
     "workspaceFolders": {},
+    "lint": { "enabled": true, "python": "py", "script": ".claude/skills/arco-dwh-powerbi/scripts/check_pbir.py" },
     "nonProductionWorkspacePatterns": ["Acceptance", "Development", "\\bDEV\\b", "\\bDev\\b", "\\bTest\\b", "\\bPOC\\b", "Sandbox"],
     "blockedWorkspacePatterns": ["\\bTEST\\b", "\\bPROD\\b", "\\bProduction\\b", "\\bUAT\\b"]
   },
@@ -66,7 +67,7 @@
       "domain": "pbi",
       "requiresApproval": true,
       "readOnly": false,
-      "allowedTools": ["Read", "Grep", "Glob", "Skill", "Edit", "Write", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git branch:*)", "Bash(git switch:*)", "Bash(git checkout -b:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git -C:*)"],
+      "allowedTools": ["Read", "Grep", "Glob", "Skill", "Edit", "Write", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git branch:*)", "Bash(git switch:*)", "Bash(git checkout -b:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git -C:*)", "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)"],
       "disallowedTools": ["Bash(git push:*)", "Bash(git merge:*)", "Bash(git reset:*)", "Bash(git rebase:*)", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Agent"]
     }
   }

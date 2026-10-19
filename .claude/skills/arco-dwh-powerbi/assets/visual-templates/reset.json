@@ -1,0 +1,194 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+ "name": "aa4ee779530b28055847",
+ "position": {
+  "x": 2.142857142857143,
+  "y": 83.57142857142858,
+  "z": 2000,
+  "height": 32.85714285714286,
+  "width": 161.42857142857144,
+  "tabOrder": 2000
+ },
+ "visual": {
+  "visualType": "actionButton",
+  "objects": {
+   "icon": [
+    {
+     "properties": {
+      "shapeType": {
+       "expr": {
+        "Literal": {
+         "Value": "'reset'"
+        }
+       }
+      },
+      "iconSize": {
+       "expr": {
+        "Literal": {
+         "Value": "20D"
+        }
+       }
+      },
+      "lineColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 2,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      },
+      "placement": {
+       "expr": {
+        "Literal": {
+         "Value": "'left'"
+        }
+       }
+      },
+      "horizontalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'center'"
+        }
+       }
+      },
+      "verticalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'middle'"
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    },
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "text": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    },
+    {
+     "properties": {
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'Reset Filters'"
+        }
+       }
+      },
+      "horizontalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'center'"
+        }
+       }
+      },
+      "bold": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "fontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      },
+      "verticalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'middle'"
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    }
+   ],
+   "outline": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "visualLink": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "type": {
+       "expr": {
+        "Literal": {
+         "Value": "'Bookmark'"
+        }
+       }
+      },
+      "tooltipPlaceholderText": {
+       "expr": {
+        "Literal": {
+         "Value": "'Reset this page''s filters to their default selections'"
+        }
+       }
+      },
+      "bookmark": {
+       "expr": {
+        "Literal": {
+         "Value": "'d1d5d5573458700eb91e'"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ },
+ "howCreated": "InsertVisualButton"
+}

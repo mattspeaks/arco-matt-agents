@@ -1,0 +1,53 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+ "name": "52fe6fa67958ee280ee7",
+ "position": {
+  "x": 180,
+  "y": 6,
+  "z": 3000,
+  "height": 51,
+  "width": 419,
+  "tabOrder": 3000
+ },
+ "visual": {
+  "visualType": "textbox",
+  "objects": {
+   "general": [
+    {
+     "properties": {
+      "paragraphs": [
+       {
+        "textRuns": [
+         {
+          "value": "IT Timecard Summary",
+          "textStyle": {
+           "fontWeight": "bold",
+           "fontSize": "24pt",
+           "color": "#ffffff"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "background": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ }
+}

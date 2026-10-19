@@ -69,6 +69,12 @@ export function ReviewCard({ approval, onError }: { approval: Approval; onError:
         <dd>
           <span className={`tag ${p.qcVerdict === 'PASS' ? 'pass' : p.qcVerdict === 'FAIL' ? 'fail' : 'subtle'}`}>{p.qcVerdict}</span>
         </dd>
+        {p.lint && (
+          <>
+            <dt>House lint</dt>
+            <dd>{p.lint}</dd>
+          </>
+        )}
         <dt>Branch</dt>
         <dd className="mono ellipsis">{p.branch}</dd>
         <dt>Changed</dt>

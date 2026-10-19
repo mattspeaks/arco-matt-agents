@@ -1,0 +1,111 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+ "name": "1598e0d79c792e0e3119",
+ "position": {
+  "x": 180,
+  "y": 53.75,
+  "z": 4000,
+  "height": 31.25,
+  "width": 298.75,
+  "tabOrder": 4000
+ },
+ "visual": {
+  "visualType": "textbox",
+  "objects": {
+   "general": [
+    {
+     "properties": {
+      "paragraphs": [
+       {
+        "textRuns": [
+         {
+          "value": "Created By: ABS Data & Analytics Team",
+          "textStyle": {
+           "fontFamily": "Arial",
+           "fontSize": "11pt",
+           "color": "#ffffff"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   ],
+   "values": [
+    {
+     "properties": {
+      "expr": {
+       "expr": {
+        "Min": {
+         "Expression": {
+          "Column": {
+           "Expression": {
+            "Subquery": {
+             "Query": {
+              "Version": 2,
+              "From": [
+               {
+                "Name": "m",
+                "Entity": "Portfolio_Measures",
+                "Type": 0
+               }
+              ],
+              "Select": [
+               {
+                "Measure": {
+                 "Expression": {
+                  "SourceRef": {
+                   "Source": "m"
+                  }
+                 },
+                 "Property": "Last Refresh Label"
+                },
+                "Name": "Measures_Table.Last Refresh CST"
+               }
+              ]
+             }
+            }
+           },
+           "Property": "Measures_Table.Last Refresh CST"
+          }
+         },
+         "IncludeAllTypes": 1
+        },
+        "Annotations": {
+         "NaturalLanguage": {
+          "version": 1,
+          "kind": "NaturalLanguage",
+          "annotation": {
+           "name": "Value",
+           "utterance": "last refresh CST"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "Value"
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "background": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ }
+}

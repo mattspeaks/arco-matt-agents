@@ -1,0 +1,106 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+ "name": "fb69effb90d0700604e0",
+ "position": {
+  "x": 991.875,
+  "y": 17.5,
+  "z": 5000,
+  "height": 31.875,
+  "width": 288.125,
+  "tabOrder": 5000
+ },
+ "visual": {
+  "visualType": "card",
+  "query": {
+   "queryState": {
+    "Values": {
+     "projections": [
+      {
+       "field": {
+        "Measure": {
+         "Expression": {
+          "SourceRef": {
+           "Entity": "Timecard Measures"
+          }
+         },
+         "Property": "Last Refresh Label"
+        }
+       },
+       "queryRef": "Timecard Measures.Last Refresh Label",
+       "nativeQueryRef": "Last Refresh Label"
+      }
+     ]
+    }
+   }
+  },
+  "objects": {
+   "labels": [
+    {
+     "properties": {
+      "fontSize": {
+       "expr": {
+        "Literal": {
+         "Value": "11D"
+        }
+       }
+      },
+      "color": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 0,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "categoryLabels": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "background": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "visualHeader": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ }
+}

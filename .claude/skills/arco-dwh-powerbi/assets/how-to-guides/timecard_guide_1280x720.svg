@@ -1,0 +1,127 @@
+<svg viewBox="0 0 1280 720" width="1280" height="720" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>IT Timecard Analytics - How to use this report</title>
+<desc>Quick-start guide for the four report pages: Time Card Summary, Time Card Details, Allocation and Productivity, and Team Accountability, with key terms, team targets, filters and color meanings.</desc>
+<rect x="0" y="0" width="1280" height="720" rx="0" fill="#0F2744"/>
+<text x="28" y="32" font-family="Arial" font-size="22" font-weight="700" fill="#FFFFFF" text-anchor="start">IT Timecard Analytics: How to use this report</text>
+<text x="28" y="50" font-family="Arial" font-size="11" font-weight="400" fill="#8AA0BC" text-anchor="start">Created by ABS Data &amp; Analytics Team</text>
+<rect x="1100" y="16" width="152" height="24" rx="12" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+<text x="1176" y="32" font-family="Arial" font-size="10.5" font-weight="400" fill="#8AA0BC" text-anchor="middle">Quick-start reference</text>
+<line x1="28" y1="62" x2="1252" y2="62" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<text x="28" y="84" font-family="Arial" font-size="12" font-weight="700" fill="#8AA0BC" text-anchor="start">Key terms:</text>
+<rect x="110" y="71" width="267" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="123" cy="82" r="4.5" fill="#7EB6F6"/>
+<text x="134" y="86" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Productivity Index: 100 = team target = goal</text>
+<rect x="385" y="71" width="347" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="398" cy="82" r="4.5" fill="#E66C37"/>
+<text x="409" y="86" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Capacity: hours to move to project/ticket work to reach 100</text>
+<rect x="740" y="71" width="224" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="753" cy="82" r="4.5" fill="#94A3B8"/>
+<text x="764" y="86" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Compliance: 32+ hrs logged each week</text>
+<rect x="972" y="71" width="203" height="22" rx="11" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1.2"/>
+<circle cx="985" cy="82" r="4.5" fill="#FFFFFF"/>
+<text x="996" y="86" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Hover ? on a visual for the math</text>
+<text x="28" y="114" font-family="Arial" font-size="12" font-weight="700" fill="#8AA0BC" text-anchor="start">Colors:</text>
+<rect x="110" y="105" width="11" height="11" rx="2" fill="#F2C811" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+<text x="126" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Projects</text>
+<rect x="188" y="105" width="11" height="11" rx="2" fill="#003865" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+<text x="204" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Operations</text>
+<rect x="278" y="105" width="11" height="11" rx="2" fill="#E66C37" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+<text x="294" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Ops - no ticket / capacity (attention)</text>
+<rect x="524" y="105" width="11" height="11" rx="2" fill="#A4262C" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+<text x="540" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Non-project</text>
+<rect x="619" y="105" width="11" height="11" rx="2" fill="#A6A6A6" stroke="rgba(255,255,255,0.35)" stroke-width="1"/>
+<text x="635" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Time off</text>
+<text x="711" y="114" font-family="Arial" font-size="10.5" font-weight="700" fill="#8AA0BC" text-anchor="start">Table shading:</text>
+<rect x="799" y="105" width="11" height="11" rx="2" fill="#8FD19E"/>
+<text x="815" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">on target</text>
+<rect x="881" y="105" width="11" height="11" rx="2" fill="#E1C233"/>
+<text x="897" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">watch</text>
+<rect x="941" y="105" width="11" height="11" rx="2" fill="#DE6A73"/>
+<text x="957" y="114" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">needs attention</text>
+<text x="28" y="138" font-family="Arial" font-size="10.5" font-weight="400" fill="#C6D2E0" text-anchor="start">Filters (top of every page): Time | Leader | Associate | Roles (solid = included, outline = hidden; tap to hide Directors or Managers) | Reset Filters puts the page back to default.</text>
+<line x1="28" y1="150" x2="1252" y2="150" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<line x1="640" y1="150" x2="640" y2="664" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+<line x1="28" y1="408" x2="1252" y2="408" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>
+<rect x="28" y="160" width="136" height="22" rx="5" fill="rgba(24,95,165,0.30)" stroke="#7EB6F6" stroke-width="1.5"/>
+<text x="96.0" y="175" font-family="Arial" font-size="11" font-weight="700" fill="#7EB6F6" text-anchor="middle">Time Card Summary</text>
+<text x="28" y="204" font-family="Arial" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="start">IT-wide view: where time lands and who is behind</text>
+<rect x="28" y="220" width="10" height="10" rx="2" fill="rgba(24,95,165,0.30)"/>
+<text x="46" y="229" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">KPI strip</text>
+<text x="46" y="243" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Overview (Productivity Index, Total Hrs, Avg Hrs/Wk, Associates Past Due) + time card mix = 100%.</text>
+<rect x="28" y="252" width="10" height="10" rx="2" fill="rgba(24,95,165,0.30)"/>
+<text x="46" y="261" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Weekly Hours by Work Type</text>
+<text x="46" y="275" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Stacked by week; orange = operations time with no INC/RITM ticket.</text>
+<rect x="28" y="284" width="10" height="10" rx="2" fill="rgba(24,95,165,0.30)"/>
+<text x="46" y="293" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Productivity Index Trend by Leader</text>
+<text x="46" y="307" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">One line per leader, complete weeks only; the goal is 100.</text>
+<rect x="28" y="316" width="10" height="10" rx="2" fill="rgba(24,95,165,0.30)"/>
+<text x="46" y="325" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Incomplete Timesheets + heat map</text>
+<text x="46" y="339" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Every associate x week: red = missing, yellow = under 32 hrs, lavender = 45+ hrs.</text>
+<rect x="28" y="352" width="580" height="36" rx="0" fill="rgba(255,255,255,0.04)"/>
+<rect x="28" y="352" width="3" height="36" rx="0" fill="rgba(255,255,255,0.2)"/>
+<text x="42" y="368" font-family="Arial" font-size="10" font-weight="700" fill="#B8C6D6" text-anchor="start">Tip:</text>
+<text x="68" y="368" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">Start here each week: the heat map shows exactly who to chase.</text>
+<rect x="670" y="160" width="136" height="22" rx="5" fill="rgba(83,74,183,0.30)" stroke="#AFA9EC" stroke-width="1.5"/>
+<text x="738.0" y="175" font-family="Arial" font-size="11" font-weight="700" fill="#AFA9EC" text-anchor="middle">Time Card Details</text>
+<text x="670" y="204" font-family="Arial" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="start">One associate compared with their team</text>
+<rect x="670" y="220" width="10" height="10" rx="2" fill="rgba(83,74,183,0.30)"/>
+<text x="688" y="229" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Pick one associate</text>
+<text x="688" y="243" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Use the Associate filter (single select). Leader narrows the list.</text>
+<rect x="670" y="252" width="10" height="10" rx="2" fill="rgba(83,74,183,0.30)"/>
+<text x="688" y="261" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Performance + time card mix</text>
+<text x="688" y="275" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">PI card is shaded by status; the mix cards add up to 100% of hours.</text>
+<rect x="670" y="284" width="10" height="10" rx="2" fill="rgba(83,74,183,0.30)"/>
+<text x="688" y="293" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Associate vs Team vs Target</text>
+<text x="688" y="307" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Index, traceable %, no-ticket %, admin %, hours and compliance, shaded by status.</text>
+<rect x="670" y="316" width="10" height="10" rx="2" fill="rgba(83,74,183,0.30)"/>
+<text x="688" y="325" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Projects &amp; tickets worked</text>
+<text x="688" y="339" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Expand a category to see each ticket; click Open to go straight to ServiceNow.</text>
+<rect x="670" y="352" width="580" height="36" rx="0" fill="rgba(255,255,255,0.04)"/>
+<rect x="670" y="352" width="3" height="36" rx="0" fill="rgba(255,255,255,0.2)"/>
+<text x="684" y="368" font-family="Arial" font-size="10" font-weight="700" fill="#B8C6D6" text-anchor="start">Tip:</text>
+<text x="710" y="368" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">High Ops - No Ticket usually means work wasn't logged to a ticket,</text>
+<text x="684" y="382" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">not that it didn't happen. Coach on ticket logging first.</text>
+<rect x="28" y="418" width="189" height="22" rx="5" fill="rgba(242,200,17,0.18)" stroke="#F2C811" stroke-width="1.5"/>
+<text x="122.5" y="433" font-family="Arial" font-size="11" font-weight="700" fill="#F2C811" text-anchor="middle">Allocation &amp; Productivity</text>
+<text x="28" y="462" font-family="Arial" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="start">Where capacity exists, by leader and associate</text>
+<rect x="28" y="478" width="10" height="10" rx="2" fill="rgba(242,200,17,0.18)"/>
+<text x="46" y="487" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Capacity (FTE) + Hours by Leader chart</text>
+<text x="46" y="501" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Orange segment = capacity: time beyond what the team target allows.</text>
+<rect x="28" y="510" width="10" height="10" rx="2" fill="rgba(242,200,17,0.18)"/>
+<text x="46" y="519" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Productivity Index by Leader</text>
+<text x="46" y="533" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Expand a leader to see associates. Hover ? for the full definition.</text>
+<rect x="28" y="542" width="10" height="10" rx="2" fill="rgba(242,200,17,0.18)"/>
+<text x="46" y="551" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Team targets (benchmark-aligned share of hours on projects/tickets)</text>
+<text x="46" y="565" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">PMO 90 | Apps 80 | Support 75 | Security 70 | Data 65 | Tech Ops 65 | DBA/special projects 20</text>
+<rect x="28" y="574" width="10" height="10" rx="2" fill="rgba(242,200,17,0.18)"/>
+<text x="46" y="583" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Detail matrix</text>
+<text x="46" y="597" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Hours by work type per person, plus Capacity Hrs and Capacity FTE at the right.</text>
+<rect x="28" y="610" width="580" height="36" rx="0" fill="rgba(255,255,255,0.04)"/>
+<rect x="28" y="610" width="3" height="36" rx="0" fill="rgba(255,255,255,0.2)"/>
+<text x="42" y="626" font-family="Arial" font-size="10" font-weight="700" fill="#B8C6D6" text-anchor="start">Tip:</text>
+<text x="68" y="626" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">Targets apply after a 15% credit for admin, meetings and training.</text>
+<text x="42" y="640" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">Capacity is not idle time; much of it is work not logged to a ticket.</text>
+<rect x="670" y="418" width="149" height="22" rx="5" fill="rgba(153,60,29,0.30)" stroke="#F0997B" stroke-width="1.5"/>
+<text x="744.5" y="433" font-family="Arial" font-size="11" font-weight="700" fill="#F0997B" text-anchor="middle">Team Accountability</text>
+<text x="670" y="462" font-family="Arial" font-size="15" font-weight="700" fill="#FFFFFF" text-anchor="start">Are time cards in, complete and approved?</text>
+<rect x="670" y="478" width="10" height="10" rx="2" fill="rgba(153,60,29,0.30)"/>
+<text x="688" y="487" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Weekly Compliance</text>
+<text x="688" y="501" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Complete weeks / expected weeks. Submitted 32-45 | Incomplete &lt;32 | Missing 0 | OT 45+.</text>
+<rect x="670" y="510" width="10" height="10" rx="2" fill="rgba(153,60,29,0.30)"/>
+<text x="688" y="519" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Trend, status mix &amp; heat map</text>
+<text x="688" y="533" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Compliance by leader over time; red cells = weeks that need attention.</text>
+<rect x="670" y="542" width="10" height="10" rx="2" fill="rgba(153,60,29,0.30)"/>
+<text x="688" y="551" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Follow-Up List</text>
+<text x="688" y="565" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Associates with missing or short weeks, most first, with their supervisor.</text>
+<rect x="670" y="574" width="10" height="10" rx="2" fill="rgba(153,60,29,0.30)"/>
+<text x="688" y="583" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF" text-anchor="start">Approval Backlog</text>
+<text x="688" y="597" font-family="Arial" font-size="10" font-weight="400" fill="#B8C6D6" text-anchor="start">Hours waiting on approval. Project time: PM or director | non-project: manager or director.</text>
+<rect x="670" y="610" width="580" height="36" rx="0" fill="rgba(255,255,255,0.04)"/>
+<rect x="670" y="610" width="3" height="36" rx="0" fill="rgba(255,255,255,0.2)"/>
+<text x="684" y="626" font-family="Arial" font-size="10" font-weight="700" fill="#B8C6D6" text-anchor="start">Tip:</text>
+<text x="710" y="626" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">Oldest (days) turns amber past 7 days and red past 14.</text>
+<text x="684" y="640" font-family="Arial" font-size="10" font-weight="400" fill="#9FB0C4" text-anchor="start">The current week is excluded until it is complete.</text>
+<line x1="28" y1="676" x2="1252" y2="676" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+<text x="28" y="696" font-family="Arial" font-size="10" font-weight="400" fill="#7488A0" text-anchor="start">Data refreshes daily; check Last Refreshed at the top right of each page.</text>
+<text x="1252" y="696" font-family="Arial" font-size="10" font-weight="400" fill="#7488A0" text-anchor="end">Questions? Contact the ABS Data &amp; Analytics Team.</text>
+</svg>

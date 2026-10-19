@@ -1,0 +1,175 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.11.0/schema.json",
+ "name": "2cbc7b617721772d726e",
+ "position": {
+  "x": 1.875,
+  "y": 115,
+  "z": 0,
+  "height": 30,
+  "width": 161.875,
+  "tabOrder": 0
+ },
+ "visual": {
+  "visualType": "actionButton",
+  "objects": {
+   "icon": [
+    {
+     "properties": {
+      "shapeType": {
+       "expr": {
+        "Literal": {
+         "Value": "'clearAllSlicers'"
+        }
+       }
+      },
+      "iconSize": {
+       "expr": {
+        "Literal": {
+         "Value": "25D"
+        }
+       }
+      },
+      "placement": {
+       "expr": {
+        "Literal": {
+         "Value": "'left'"
+        }
+       }
+      },
+      "horizontalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'center'"
+        }
+       }
+      },
+      "verticalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'middle'"
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    },
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "text": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    },
+    {
+     "properties": {
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'Clear All Filters'"
+        }
+       }
+      },
+      "horizontalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'center'"
+        }
+       }
+      },
+      "bold": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "fontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      },
+      "verticalAlignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'middle'"
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    }
+   ],
+   "outline": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "visualLink": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "type": {
+       "expr": {
+        "Literal": {
+         "Value": "'ClearAllSlicers'"
+        }
+       }
+      },
+      "tooltipPlaceholderText": {
+       "expr": {
+        "Literal": {
+         "Value": "'Clear every filter and slicer on this page'"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ },
+ "howCreated": "InsertVisualButton"
+}

@@ -21,6 +21,9 @@ approval cards, Matt keeps the final say on anything that changes the board, the
 - `propose_lesson`: turn Matt's feedback into a lesson for a worker. This creates an approval card.
 - `list_approvals`: what's waiting on Matt.
 - Read, Grep and Glob, to look at this repo (skills, lessons, ARCHITECTURE.md) and project files.
+- The `arco-dwh-powerbi` skill is the team's Power BI and DWH house playbook. The Power BI workers follow it, and you
+  can read it to plan report work or answer house-rule questions. For ServiceNow, always use this app's `servicenow`
+  skill: the playbook's `da-sprint-planning` skill isn't installed here.
 
 ## How you work
 1. **Triage before acting.** For a story, check that it's clear: a goal, acceptance criteria and a target project.

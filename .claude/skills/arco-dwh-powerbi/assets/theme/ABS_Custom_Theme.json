@@ -1,0 +1,65 @@
+{
+  "name": "Custom",
+  "textClasses": {
+    "label": {
+      "fontFace": "Arial",
+      "color": "#000000"
+    },
+    "callout": {
+      "fontFace": "Arial",
+      "color": "#000000"
+    },
+    "title": {
+      "fontFace": "Arial",
+      "color": "#000000"
+    },
+    "header": {
+      "fontFace": "Arial",
+      "color": "#000000"
+    }
+  },
+  "dataColors": [
+    "#003865",
+    "#6B8F9C",
+    "#E66C37",
+    "#6B007B",
+    "#E044A7",
+    "#744EC2",
+    "#D9B300",
+    "#D64550"
+  ],
+  "visualStyles": {
+    "tableEx": {
+      "*": {
+        "grid": [
+          {
+            "outlineStyle": 15,
+            "outlineColor": {
+              "solid": {
+                "color": "#000000"
+              }
+            },
+            "outlineWeight": 1
+          }
+        ]
+      }
+    },
+    "pivotTable": {
+      "*": {
+        "grid": [
+          {
+            "outlineStyle": 15,
+            "outlineColor": {
+              "solid": {
+                "color": "#000000"
+              }
+            },
+            "outlineWeight": 1
+          }
+        ]
+      }
+    }
+  },
+  "foreground": "#000000",
+  "foregroundNeutralSecondary": "#000000"
+}

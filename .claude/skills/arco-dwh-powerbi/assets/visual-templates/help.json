@@ -1,0 +1,175 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+ "name": "0e69ffba6ae19da512ef",
+ "position": {
+  "x": 888,
+  "y": 4,
+  "z": 13000,
+  "height": 50,
+  "width": 96,
+  "tabOrder": 13000
+ },
+ "visual": {
+  "visualType": "actionButton",
+  "objects": {
+   "icon": [
+    {
+     "properties": {
+      "shapeType": {
+       "expr": {
+        "Literal": {
+         "Value": "'help'"
+        }
+       }
+      },
+      "lineColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 0,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    }
+   ],
+   "text": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    },
+    {
+     "properties": {
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'HELP'"
+        }
+       }
+      },
+      "fontSize": {
+       "expr": {
+        "Literal": {
+         "Value": "11D"
+        }
+       }
+      },
+      "fontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 0,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "id": "default"
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "title": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      },
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'HELP'"
+        }
+       }
+      },
+      "alignment": {
+       "expr": {
+        "Literal": {
+         "Value": "'right'"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "background": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "border": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "visualLink": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "type": {
+       "expr": {
+        "Literal": {
+         "Value": "'PageNavigation'"
+        }
+       }
+      },
+      "navigationSection": {
+       "expr": {
+        "Literal": {
+         "Value": "'a851769b0afc37f3ec58'"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ },
+ "howCreated": "InsertVisualButton"
+}

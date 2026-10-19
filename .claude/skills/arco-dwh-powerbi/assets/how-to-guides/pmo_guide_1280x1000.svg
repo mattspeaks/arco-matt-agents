@@ -1,0 +1,157 @@
+<svg viewBox="0 0 1280 1180" width="1280" height="1180" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>SNOW Projects and Time - How to use this report</title>
+<rect x="0" y="0" width="1280" height="1180" fill="#0F2744"/>
+<text x="28" y="34" font-family="Arial" font-size="22" font-weight="700" fill="#FFFFFF">SNOW Projects &amp; Time: How to use this report</text>
+<text x="28" y="54" font-family="Arial" font-size="11" fill="#8AA0BC">Created by ABS Data &amp; Analytics Team. Data: ServiceNow PPM and time cards (bronze_servicenow), refreshed with the dataset.</text>
+<line x1="28" y1="68" x2="1252" y2="68" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>
+<text x="28" y="92" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">PAGES</text>
+<text x="28" y="114" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Portfolio Health</text>
+<text x="170" y="114" font-family="Arial" font-size="11.5" fill="#D6E1EA">PM-reported status by project, with financials and unposted time. Badge column first; worst first.</text>
+<text x="28" y="136" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Project Health</text>
+<text x="170" y="136" font-family="Arial" font-size="11.5" fill="#D6E1EA">Drill-through: right-click a project &gt; Drill through &gt; Project Health. Status-check tiles + action items with owners.</text>
+<text x="28" y="158" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Unposted Time</text>
+<text x="170" y="158" font-family="Arial" font-size="11.5" fill="#D6E1EA">Project time cards not yet posted to cost ($110/hr), split by status, with who owns each action.</text>
+<text x="28" y="180" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Demand Health</text>
+<text x="170" y="180" font-family="Arial" font-size="11.5" fill="#D6E1EA">Demand pipeline; idle demands by assignee and PM; the table lists who should update each demand.</text>
+<text x="28" y="216" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">INDICATORS (SHAPE AND SYMBOL CARRY THE MEANING, SO THEY READ WITHOUT COLOR)</text>
+<g transform="translate(28 230) scale(1.2)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="64" y="243" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Act</text>
+<text x="64" y="257" font-family="Arial" font-size="10" fill="#D6E1EA">red octagon !</text>
+<g transform="translate(198 230) scale(1.2)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="234" y="243" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Watch</text>
+<text x="234" y="257" font-family="Arial" font-size="10" fill="#D6E1EA">amber triangle !</text>
+<g transform="translate(368 230) scale(1.2)"><circle cx='12' cy='12' r='11' fill='#2E7D32'/><path d='M6.8 12.6 L10.3 16 L17.4 8.6' fill='none' stroke='#FFFFFF' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/></g>
+<text x="404" y="243" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">OK</text>
+<text x="404" y="257" font-family="Arial" font-size="10" fill="#D6E1EA">green check</text>
+<g transform="translate(538 230) scale(1.2)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="574" y="243" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="574" y="257" font-family="Arial" font-size="10" fill="#D6E1EA">slate i: process / data</text>
+<g transform="translate(708 230) scale(1.2)"><circle cx='12' cy='12' r='11' fill='#A6A6A6'/><rect x='6.5' y='10.7' width='11' height='2.6' rx='1.3' fill='#FFFFFF'/></g>
+<text x="744" y="243" font-family="Arial" font-size="11.5" font-weight="700" fill="#FFFFFF">No data</text>
+<text x="744" y="257" font-family="Arial" font-size="10" fill="#D6E1EA">gray dash</text>
+<g transform="translate(1000 224)"><svg xmlns='http://www.w3.org/2000/svg' width='240' height='72' viewBox='0 0 240 72'><rect x='0.5' y='0.5' width='239' height='71' rx='8' fill='#FFFFFF' stroke='#D0D7DE'/><rect x='0.5' y='0.5' width='6' height='71' rx='3' fill='#D64550'/><g transform='translate(18 18) scale(1.5)'><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g><text x='66' y='38' font-family='Arial' font-size='26' font-weight='700' fill='#252423'>$204K</text><text x='66' y='58' font-family='Arial' font-size='11.5' fill='#605E5C'>Waiting on line mgrs</text></svg></g>
+<text x="28" y="284" font-family="Arial" font-size="11" fill="#D6E1EA">Tiles: badge + amount + who acts. Tables and cards use red / amber / green fills;</text>
+<text x="28" y="302" font-family="Arial" font-size="11" fill="#D6E1EA">charts use the color-blind palette (orange = needs attention, navy, slate). Hover ? on any visual for its rule.</text>
+<text x="28" y="336" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">PM-REPORTED STATUS IS THE HEADLINE; CALCULATED VALUES ARE CHECKS</text>
+<text x="28" y="356" font-family="Arial" font-size="11" fill="#D6E1EA">Health = the color the PM sets in ServiceNow. Calc Differs counts projects where SPI, CPI or the PMO guideline gives another color.</text>
+<text x="28" y="376" font-family="Arial" font-size="11" fill="#D6E1EA">Badge column: red = PM reports Red, or a calculation is Red and the PM does not show it; amber = PM Yellow or a calculation differs; green = all agree.</text>
+<text x="28" y="396" font-family="Arial" font-size="11" fill="#D6E1EA">SPI = % complete / % of time used (0.90+ On Track, 0.75 to 0.90 At Risk, under 0.75 Behind). CPI = earned value (budget x % complete) / posted cost.</text>
+<text x="28" y="430" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">PMO RAG GUIDELINE AND CHECKS (SCOPE AND RESOURCES = PM JUDGMENT; NOT MEASURABLE FROM SERVICENOW)</text>
+<text x="28" y="452" font-family="Arial" font-size="11" font-weight="700" fill="#8AA0BC">Area</text>
+<text x="140" y="452" font-family="Arial" font-size="11" font-weight="700" fill="#8AA0BC">Level</text>
+<text x="200" y="452" font-family="Arial" font-size="11" font-weight="700" fill="#8AA0BC">Item</text>
+<text x="450" y="452" font-family="Arial" font-size="11" font-weight="700" fill="#8AA0BC">Measured as</text>
+<rect x="24" y="460" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 461) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="28" y="475" font-family="Arial" font-size="10.5" fill="#FFFFFF">Schedule</text>
+<text x="162" y="475" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Red</text>
+<text x="200" y="475" font-family="Arial" font-size="10" fill="#FFFFFF">Schedule slipped 20%+</text>
+<text x="450" y="475" font-family="Arial" font-size="10" fill="#D6E1EA">Slip of 20%+ of the approved duration (end date moved past baseline, past due, or projected from % complete vs time used)</text>
+<rect x="24" y="483" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 484) scale(0.75)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="28" y="498" font-family="Arial" font-size="10.5" fill="#FFFFFF">Schedule</text>
+<text x="162" y="498" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Yellow</text>
+<text x="200" y="498" font-family="Arial" font-size="10" fill="#FFFFFF">Schedule slipped ~10%</text>
+<text x="450" y="498" font-family="Arial" font-size="10" fill="#D6E1EA">Slip of 10% to 20% of the approved duration, or a milestone past due</text>
+<rect x="24" y="506" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 507) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="28" y="521" font-family="Arial" font-size="10.5" fill="#FFFFFF">Budget</text>
+<text x="162" y="521" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Red</text>
+<text x="200" y="521" font-family="Arial" font-size="10" fill="#FFFFFF">Trending 20%+ over budget</text>
+<text x="450" y="521" font-family="Arial" font-size="10" fill="#D6E1EA">Estimate at completion 20%+ over the approved budget (CapEx + OpEx); cost includes unposted time</text>
+<rect x="24" y="529" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 530) scale(0.75)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="28" y="544" font-family="Arial" font-size="10.5" fill="#FFFFFF">Budget</text>
+<text x="162" y="544" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Yellow</text>
+<text x="200" y="544" font-family="Arial" font-size="10" fill="#FFFFFF">Trending ~10% over budget</text>
+<text x="450" y="544" font-family="Arial" font-size="10" fill="#D6E1EA">Estimate at completion 10% to 20% over budget, or spend with no approved budget</text>
+<rect x="24" y="552" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 553) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="28" y="567" font-family="Arial" font-size="10.5" fill="#FFFFFF">Issues / Risks</text>
+<text x="162" y="567" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Red</text>
+<text x="200" y="567" font-family="Arial" font-size="10" fill="#FFFFFF">Blocker with no resolution path</text>
+<text x="450" y="567" font-family="Arial" font-size="10" fill="#D6E1EA">Open Critical issue, open issue 14+ days past due, or high/absolute risk with no mitigation</text>
+<rect x="24" y="575" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 576) scale(0.75)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="28" y="590" font-family="Arial" font-size="10.5" fill="#FFFFFF">Issues / Risks</text>
+<text x="162" y="590" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Yellow</text>
+<text x="200" y="590" font-family="Arial" font-size="10" fill="#FFFFFF">Issue or risk being worked</text>
+<text x="450" y="590" font-family="Arial" font-size="10" fill="#D6E1EA">Any open issue, an open risk past due, or an open high/absolute risk</text>
+<rect x="24" y="598" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 599) scale(0.75)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="28" y="613" font-family="Arial" font-size="10.5" fill="#FFFFFF">Alert</text>
+<text x="162" y="613" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Alert</text>
+<text x="200" y="613" font-family="Arial" font-size="10" fill="#FFFFFF">End date moved without a change request</text>
+<text x="450" y="613" font-family="Arial" font-size="10" fill="#D6E1EA">End date moved more than 10% of the approved duration past the approved end date, with no schedule change request on file</text>
+<rect x="24" y="621" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 622) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="636" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="636" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="636" font-family="Arial" font-size="10" fill="#FFFFFF">PM status differs from calculated</text>
+<text x="450" y="636" font-family="Arial" font-size="10" fill="#D6E1EA">Calculated SPI color, CPI color or guideline rating is not the PM-reported color</text>
+<rect x="24" y="644" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 645) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="659" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="659" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="659" font-family="Arial" font-size="10" fill="#FFFFFF">Tasks past due</text>
+<text x="450" y="659" font-family="Arial" font-size="10" fill="#D6E1EA">3+ open tasks past due, or 15%+ of open tasks past due (input to the PM's Resources judgment)</text>
+<rect x="24" y="667" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 668) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="682" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="682" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="682" font-family="Arial" font-size="10" fill="#FFFFFF">No status note</text>
+<text x="450" y="682" font-family="Arial" font-size="10" fill="#D6E1EA">The ServiceNow status update field is empty</text>
+<rect x="24" y="690" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 691) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="705" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="705" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="705" font-family="Arial" font-size="10" fill="#FFFFFF">Time not posted to cost</text>
+<text x="450" y="705" font-family="Arial" font-size="10" fill="#D6E1EA">Project time cards 14+ days old that never posted an expense line ($110/hr)</text>
+<rect x="24" y="713" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 714) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="728" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="728" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="728" font-family="Arial" font-size="10" fill="#FFFFFF">Time posted twice</text>
+<text x="450" y="728" font-family="Arial" font-size="10" fill="#D6E1EA">A time card posted more than one expense line</text>
+<rect x="24" y="736" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 737) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="751" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="751" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="751" font-family="Arial" font-size="10" fill="#FFFFFF">Budget but nothing posted</text>
+<text x="450" y="751" font-family="Arial" font-size="10" fill="#D6E1EA">Approved budget, $0 posted, 25%+ complete</text>
+<rect x="24" y="759" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 760) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="774" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="774" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="774" font-family="Arial" font-size="10" fill="#FFFFFF">% complete looks too high</text>
+<text x="450" y="774" font-family="Arial" font-size="10" fill="#D6E1EA">% complete is 40+ points ahead of % of time used</text>
+<rect x="24" y="782" width="1232" height="21" rx="4" fill="rgba(255,255,255,0.04)"/>
+<g transform="translate(140 783) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="28" y="797" font-family="Arial" font-size="10.5" fill="#FFFFFF">Process</text>
+<text x="162" y="797" font-family="Arial" font-size="10.5" font-weight="700" fill="#FFFFFF">Check</text>
+<text x="200" y="797" font-family="Arial" font-size="10" fill="#FFFFFF">No approved baseline</text>
+<text x="450" y="797" font-family="Arial" font-size="10" fill="#D6E1EA">No approved end date, or approved budget is $0</text>
+<text x="28" y="833" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">UNPOSTED TIME: STATUS AND WHO OWNS THE ACTION</text>
+<g transform="translate(28 841) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="52" y="855" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">Partially Approved</text>
+<text x="210" y="855" font-family="Arial" font-size="11" fill="#D6E1EA">One approver (usually the PM) approved; waiting on the other (usually the line manager). Owner: that approver.</text>
+<g transform="translate(28 863) scale(0.75)"><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x="52" y="877" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">Awaiting Approval</text>
+<text x="210" y="877" font-family="Arial" font-size="11" fill="#D6E1EA">Submitted; no approver has acted yet. Owner: the approvers on the card.</text>
+<g transform="translate(28 885) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="52" y="899" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">No Approver</text>
+<text x="210" y="899" font-family="Arial" font-size="11" fill="#D6E1EA">No approver routed in ServiceNow. Owner: PMO.</text>
+<g transform="translate(28 907) scale(0.75)"><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x="52" y="921" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">Approved Not Posted</text>
+<text x="210" y="921" font-family="Arial" font-size="11" fill="#D6E1EA">Fully approved but no expense line. Owner: ServiceNow admin (reprocess).</text>
+<g transform="translate(28 929) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="52" y="943" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">Not Submitted</text>
+<text x="210" y="943" font-family="Arial" font-size="11" fill="#D6E1EA">Draft time never submitted. Owner: the employee.</text>
+<g transform="translate(28 951) scale(0.75)"><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x="52" y="965" font-family="Arial" font-size="11" font-weight="700" fill="#FFFFFF">Posted Twice</text>
+<text x="210" y="965" font-family="Arial" font-size="11" fill="#D6E1EA">Two expense lines for one card ($220/hr). Owner: Finance (reverse the duplicate).</text>
+<text x="28" y="997" font-family="Arial" font-size="13" font-weight="700" fill="#7EB6F6">DEFINITIONS</text>
+<text x="28" y="1017" font-family="Arial" font-size="11" fill="#D6E1EA">Budget = CapEx + OpEx on the ServiceNow project. Actual = posted work cost. EAC = cost to date (incl. unposted time) / % complete.</text>
+<text x="28" y="1037" font-family="Arial" font-size="11" fill="#D6E1EA">Unposted time = project time cards with no expense line, at the $110/hr blended rate. ABS ... Operations ticket buckets are excluded everywhere.</text>
+<text x="28" y="1057" font-family="Arial" font-size="11" fill="#D6E1EA">Since June 2026 project time cards need two approvals (PM and the person's line manager); a card posts only after both approve.</text>
+</svg>

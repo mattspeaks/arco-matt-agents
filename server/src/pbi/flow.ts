@@ -12,6 +12,7 @@ import { createRun, getRun, parseMeta, type Run } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { askTimeEntry } from '../timesheet.js';
 import { startCloseout } from '../closeout.js';
+import { lintBranch, lintSummary, type LintDiff } from './lint.js';
 import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
 import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
@@ -56,6 +57,8 @@ export interface FlowData {
   activeRunId?: string;
   lastBuilder?: string;
   lastQc?: { verdict?: string; result: string };
+  /** The house linter on the last build: new errors / warnings vs the starting point. */
+  lastLint?: { ran: boolean; newErrors: number; newWarnings: number; preexisting: number };
   /** Head when the Review card went up: later commits are Matt's own edits in Desktop. */
   reviewSha?: string;
   /** The pre-publish QC and the commit it checked. */
@@ -485,6 +488,7 @@ async function raiseReviewCard(story: string, d: FlowData, qc?: { verdict?: stri
       storyNumber: story,
       round: String(d.round),
       qcVerdict: qc?.verdict ?? 'not run',
+      lint: d.lastLint?.ran ? `${d.lastLint.newErrors} new error(s), ${d.lastLint.newWarnings} new warning(s)` : '',
       summary: (/Summary:\s*([\s\S]*?)(?:\n[A-Z][\w /]+:|$)/.exec(builder)?.[1] ?? builder).trim().slice(0, 1500),
       files: String(changed.length),
       branch: d.branch,
@@ -722,6 +726,7 @@ async function buildLoop(story: string) {
   let findings: string | undefined;
   let builder = '';
   let qc: { verdict?: string; result: string } = { result: '' };
+  let lint: LintDiff | undefined;
 
   for (let pass = 1; pass <= 3; pass++) {
     await postAppNote(data.conversationId, `Builder pass ${pass}${label} started.`);
@@ -733,22 +738,39 @@ async function buildLoop(story: string) {
 
     const files = await changedFiles(wt, base);
     const stat = await diffStat(wt, base);
-    const q = await runWorker('pbi-qc', qcBrief(story, data, pass, files, stat, findings), story, wt);
+    lint = await lintBranch({ worktree: wt, reportRel: data.reportDir, baseSha: base });
+    const q = await runWorker('pbi-qc', qcBrief(story, data, pass, files, stat, lintSummary(lint), findings), story, wt);
     if (!q) return;
     if (q.status !== 'succeeded') throw new Error(`QC review ${pass} ${q.status}${q.error ? `: ${q.error}` : ''}`);
-    qc = { verdict: parseMeta<{ verdict?: string }>(q).verdict, result: q.result ?? '' };
+    qc = withLint({ verdict: parseMeta<{ verdict?: string }>(q).verdict, result: q.result ?? '' }, lint);
     const final = qc.verdict === 'PASS' || pass === 3;
-    await postAppNote(data.conversationId, `QC review ${pass}${label}: **${qc.verdict ?? 'no verdict'}**${final ? '' : '. Sending the findings back to the builder.'}`);
+    await postAppNote(
+      data.conversationId,
+      `QC review ${pass}${label}: **${qc.verdict ?? 'no verdict'}**${lint.ran ? ` (house linter: ${lint.newErrors.length} new error(s), ${lint.newWarnings.length} new warning(s))` : ''}${final ? '' : '. Sending the findings back to the builder.'}`,
+    );
     if (qc.verdict === 'PASS') break;
     findings = qc.result;
   }
 
   const current = await getFlow(story);
   if (current?.stage !== 'building') return;
-  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc };
+  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint) };
   await saveFlow(story, 'review', next);
   await raiseReviewCard(story, next, qc);
 }
+
+/** New linter errors fail QC whatever the QC run said (Matt's rule, 2026-10-19); the linter's findings lead the result. */
+function withLint<T extends { verdict?: string; result: string }>(qc: T, lint: LintDiff): T {
+  if (!lint.ran) return qc;
+  const failed = lint.newErrors.length > 0;
+  return {
+    ...qc,
+    verdict: failed ? 'FAIL' : qc.verdict,
+    result: `${failed && qc.verdict === 'PASS' ? 'FAIL (house linter: new errors on this branch)\n\n' : ''}${lintSummary(lint)}\n\n${qc.result}`,
+  };
+}
+
+const lintCounts = (l: LintDiff) => ({ ran: l.ran, newErrors: l.newErrors.length, newWarnings: l.newWarnings.length, preexisting: l.preexisting.errors + l.preexisting.warnings });
 
 function builderBrief(story: string, d: FlowData, pass: number, findings?: string): string {
   const wt = d.worktree!;
@@ -767,19 +789,21 @@ function builderBrief(story: string, d: FlowData, pass: number, findings?: strin
       `- Report: ${join(wt, d.reportDir!)}. Keep its current format (PBIR-Legacy report.json or PBIR definition/).`,
       d.modelDir ? `- Semantic model (TMDL): ${join(wt, d.modelDir)}` : `- No semantic model in the repo: ${d.thinReportNote ?? 'thin report'} Report changes only; say so if the plan needs model changes.`,
       `- Work only in those folders. Commit with \`git -C "${wt}" commit\` and a message starting with ${story}. Don't push.`,
+      `- House linter: before you commit, run \`py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py "${join(wt, d.reportDir!)}"\` and fix every ERROR your change introduced. Errors that were there before the branch are out of scope unless the plan says otherwise. The app runs it too, and new errors fail QC.`,
     ].join('\n'),
   ]
     .filter(Boolean)
     .join('\n\n');
 }
 
-function qcBrief(story: string, d: FlowData, pass: number, files: string[], stat: string, previous?: string): string {
+function qcBrief(story: string, d: FlowData, pass: number, files: string[], stat: string, lint: string, previous?: string): string {
   const wt = d.worktree!;
   return [
     `Story ${story}: QC review ${pass}${pass === 3 ? ' (final confirmation)' : ''} of "${d.reportName}".`,
     `Target project: ${join(wt, dirname(d.reportDir!))} (report ${basename(d.reportDir!)}${d.modelDir ? `, model ${basename(d.modelDir)}` : ''}).`,
     `## The branch's changes (the app ran git for you: \`git diff --stat ${diffBase(d)!.slice(0, 7)} HEAD\`)\n\`\`\`\n${stat || '(no changes)'}\n\`\`\`\n${files.map((f) => `- ${join(wt, f)}`).join('\n')}`,
     `This list is authoritative for the diff scope. Don't fail a rule only because you can't run git yourself. Review the changed files against your rules, and check that the plan${d.revisions.length ? ', the revisions' : ''} and the story's acceptance criteria are met.`,
+    `## House linter (the app ran it on the branch and on its starting point)\n${lint}\n\nThe linter covers the mechanical house rules. Report its new findings in your table, don't re-derive them, and spend your review on the rules it can't check (see qc-rules.md).`,
     `## Plan\n${d.plan}`,
     d.revisions.length && `## Revisions\n${d.revisions.join('\n\n')}`,
     previous && `## Previous QC findings: confirm each one is fixed\n${previous}`,
@@ -1021,11 +1045,13 @@ async function finalQc(story: string) {
     `Final QC started on exactly what will be published (${files.length} files changed on the branch${manual.length ? `, including ${manual.length} you changed in Desktop during review` : ''}).`,
   );
 
+  const lint = await lintBranch({ worktree: wt, reportRel: data.reportDir!, baseSha: base });
   let qc: { verdict?: string; result: string; runId?: string } = { verdict: 'not run', result: '' };
-  const q = await runWorker('pbi-qc', finalQcBrief(story, data, files, stat, manual), story, wt, 'final_qc');
+  const q = await runWorker('pbi-qc', finalQcBrief(story, data, files, stat, manual, lintSummary(lint)), story, wt, 'final_qc');
   if (!q) return; // stopped
   if (q.status === 'succeeded') qc = { verdict: parseMeta<{ verdict?: string }>(q).verdict ?? 'no verdict', result: q.result ?? '', runId: q.id };
   else qc = { verdict: 'not run', result: `QC didn't finish (${q.status}${q.error ? `: ${q.error}` : ''}).`, runId: q.id };
+  qc = withLint(qc, lint);
 
   const current = await getFlow(story);
   if (current?.stage !== 'final_qc') return;
@@ -1056,7 +1082,7 @@ async function raisePublishCard(story: string, d: FlowData, qc: { verdict?: stri
   await postApprovalCard(d.conversationId, card.id);
 }
 
-function finalQcBrief(story: string, d: FlowData, files: string[], stat: string, manual: string[]): string {
+function finalQcBrief(story: string, d: FlowData, files: string[], stat: string, manual: string[], lint: string): string {
   const wt = d.worktree!;
   return [
     `Story ${story}: FINAL pre-publish QC of "${d.reportName}". Matt has reviewed the report in Power BI Desktop and approved it. This is exactly what will be published to Fabric and go into the PR, so report every issue you see.`,
@@ -1066,6 +1092,7 @@ function finalQcBrief(story: string, d: FlowData, files: string[], stat: string,
       ? `## Changed by Matt in Desktop during his review (not seen by any earlier QC run: look at these closely)\n${manual.map((f) => `- ${join(wt, f)}`).join('\n')}`
       : '## Changed by Matt in Desktop during his review\nNothing.',
     "This list is authoritative for the diff scope. Don't fail a rule only because you can't run git. Check the changed files against your rules, and check that the plan, the revisions and the story's acceptance criteria are met. Issues that were already there before this branch are PRE-EXISTING (out of scope), as your lessons say.",
+    `## House linter (the app ran it on what will be published, and on the starting point)\n${lint}\n\nReport its new findings in your table. New linter errors fail this QC whatever else you find.`,
     `## Plan\n${d.plan}`,
     d.revisions.length && `## Revisions\n${d.revisions.join('\n\n')}`,
     'After your usual PASS/FAIL line and table, add:\n\n### What is being published\n3–6 plain bullets: what changes for report users, anything risky, and anything Matt should check after publishing.',

@@ -7,8 +7,14 @@ model: sonnet
 You are the ARCO Power BI QC reviewer. You never modify files.
 
 Before reviewing:
-1. Read `.claude/skills/powerbi/qc-rules.md`, `.claude/skills/style-guide/SKILL.md` and `.claude/skills/medallion/SKILL.md` in this repo.
-2. Read `memory/pbi-qc-lessons.md`.
+1. Read `.claude/skills/powerbi/qc-rules.md` and `.claude/skills/powerbi/SKILL.md` in this repo.
+2. Load the `arco-dwh-powerbi` skill (the house playbook) and read the reference files the rules point to for what the
+   branch touches (`pbir-rules.md`, `brandbook.md`, `color-palettes.md`, `feedback-and-actions.md`, and
+   `wip-accounting-rules.md` for finance stories).
+3. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-qc-lessons.md`.
+
+The app runs the house linter (`check_pbir.py`) for you and puts its new findings in your brief. Any new linter ERROR
+means FAIL. Put its findings in your table, and spend your own review on the rules the linter can't check.
 
 Then run every rule in `qc-rules.md` against the target project given in your brief (its `.SemanticModel/` and
 `.Report/` folders). A rule whose method needs a tool you don't have (e.g. Tabular Editor BPA) is reported as

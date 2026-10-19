@@ -1,0 +1,590 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+ "name": "swk1000000000000000a",
+ "position": {
+  "x": 12,
+  "y": 247,
+  "z": 21000,
+  "height": 260,
+  "width": 636,
+  "tabOrder": 21000
+ },
+ "visual": {
+  "visualType": "columnChart",
+  "query": {
+   "queryState": {
+    "Category": {
+     "projections": [
+      {
+       "field": {
+        "Column": {
+         "Expression": {
+          "SourceRef": {
+           "Entity": "Dim Date"
+          }
+         },
+         "Property": "Week Start (Sun)"
+        }
+       },
+       "queryRef": "Dim Date.Week Start (Sun)",
+       "nativeQueryRef": "Week",
+       "active": true
+      }
+     ]
+    },
+    "Series": {
+     "projections": [
+      {
+       "field": {
+        "Column": {
+         "Expression": {
+          "SourceRef": {
+           "Entity": "Fact Time Worked All Buckets"
+          }
+         },
+         "Property": "Chart Group"
+        }
+       },
+       "queryRef": "Fact Time Worked All Buckets.Chart Group",
+       "nativeQueryRef": "Work Type",
+       "active": true
+      }
+     ]
+    },
+    "Y": {
+     "projections": [
+      {
+       "field": {
+        "Aggregation": {
+         "Expression": {
+          "Column": {
+           "Expression": {
+            "SourceRef": {
+             "Entity": "Fact Time Worked All Buckets"
+            }
+           },
+           "Property": "Hours"
+          }
+         },
+         "Function": 0
+        }
+       },
+       "queryRef": "Sum(Fact Time Worked All Buckets.Hours)",
+       "nativeQueryRef": "Hours"
+      }
+     ]
+    }
+   },
+   "sortDefinition": {
+    "sort": [
+     {
+      "field": {
+       "Column": {
+        "Expression": {
+         "SourceRef": {
+          "Entity": "Dim Date"
+         }
+        },
+        "Property": "Week Start (Sun)"
+       }
+      },
+      "direction": "Ascending"
+     }
+    ],
+    "isDefaultSort": true
+   }
+  },
+  "objects": {
+   "legend": [
+    {
+     "properties": {
+      "position": {
+       "expr": {
+        "Literal": {
+         "Value": "'Top'"
+        }
+       }
+      },
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "showTitle": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      },
+      "labelColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "categoryAxis": [
+    {
+     "properties": {
+      "showAxisTitle": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      },
+      "labelColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "valueAxis": [
+    {
+     "properties": {
+      "showAxisTitle": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      },
+      "labelColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "labels": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "dataPoint": [
+    {
+     "properties": {}
+    },
+    {
+     "properties": {
+      "fill": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#F2C811'"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "data": [
+       {
+        "scopeId": {
+         "Comparison": {
+          "ComparisonKind": 0,
+          "Left": {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Entity": "Fact Time Worked All Buckets"
+             }
+            },
+            "Property": "Chart Group"
+           }
+          },
+          "Right": {
+           "Literal": {
+            "Value": "'Project / Billable'"
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "properties": {
+      "fill": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#003865'"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "data": [
+       {
+        "scopeId": {
+         "Comparison": {
+          "ComparisonKind": 0,
+          "Left": {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Entity": "Fact Time Worked All Buckets"
+             }
+            },
+            "Property": "Chart Group"
+           }
+          },
+          "Right": {
+           "Literal": {
+            "Value": "'Ops - Ticket'"
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "properties": {
+      "fill": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#E66C37'"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "data": [
+       {
+        "scopeId": {
+         "Comparison": {
+          "ComparisonKind": 0,
+          "Left": {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Entity": "Fact Time Worked All Buckets"
+             }
+            },
+            "Property": "Chart Group"
+           }
+          },
+          "Right": {
+           "Literal": {
+            "Value": "'Ops - No Ticket'"
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "properties": {
+      "fill": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#A4262C'"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "data": [
+       {
+        "scopeId": {
+         "Comparison": {
+          "ComparisonKind": 0,
+          "Left": {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Entity": "Fact Time Worked All Buckets"
+             }
+            },
+            "Property": "Chart Group"
+           }
+          },
+          "Right": {
+           "Literal": {
+            "Value": "'Non-Project'"
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    },
+    {
+     "properties": {
+      "fill": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#A6A6A6'"
+          }
+         }
+        }
+       }
+      }
+     },
+     "selector": {
+      "data": [
+       {
+        "scopeId": {
+         "Comparison": {
+          "ComparisonKind": 0,
+          "Left": {
+           "Column": {
+            "Expression": {
+             "SourceRef": {
+              "Entity": "Fact Time Worked All Buckets"
+             }
+            },
+            "Property": "Chart Group"
+           }
+          },
+          "Right": {
+           "Literal": {
+            "Value": "'Time Off'"
+           }
+          }
+         }
+        }
+       }
+      ]
+     }
+    }
+   ],
+   "totals": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "title": [
+    {
+     "properties": {
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'Weekly Hours by Work Type [Hover ? For Info]'"
+        }
+       }
+      },
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "fontSize": {
+       "expr": {
+        "Literal": {
+         "Value": "11D"
+        }
+       }
+      },
+      "fontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 0,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      },
+      "background": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 2,
+           "Percent": 0
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "border": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "radius": {
+       "expr": {
+        "Literal": {
+         "Value": "10D"
+        }
+       }
+      },
+      "color": {
+       "solid": {
+        "color": {
+         "expr": {
+          "ThemeDataColor": {
+           "ColorId": 0,
+           "Percent": -0.2
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "dropShadow": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "visualHeader": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "showTooltipButton": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "visualHeaderTooltip": [
+    {
+     "properties": {
+      "type": {
+       "expr": {
+        "Literal": {
+         "Value": "'Default'"
+        }
+       }
+      },
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'Hours logged each week, stacked by time card bucket: Project / Billable (yellow); Ops - Ticket (dark blue, operations time logged to an INC/RITM); Ops - No Ticket (orange, operations time with no INC/RITM ticket); Non-Project (deep red, admin, meetings and training); Time Off (gray).'"
+        }
+       }
+      },
+      "fontSize": {
+       "expr": {
+        "Literal": {
+         "Value": "10D"
+        }
+       }
+      },
+      "titleFontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      },
+      "background": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#FFFFFF'"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ }
+}

@@ -1,0 +1,181 @@
+{
+ "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+ "name": "e6a8a260b72b70ea03bb",
+ "position": {
+  "x": 437,
+  "y": 83,
+  "z": 11000,
+  "height": 72,
+  "width": 230,
+  "tabOrder": 11000
+ },
+ "visual": {
+  "visualType": "slicer",
+  "query": {
+   "queryState": {
+    "Values": {
+     "projections": [
+      {
+       "field": {
+        "Column": {
+         "Expression": {
+          "SourceRef": {
+           "Entity": "Employee Name Bridge"
+          }
+         },
+         "Property": "Director"
+        }
+       },
+       "queryRef": "Employee Name Bridge.Director",
+       "nativeQueryRef": "Director",
+       "active": true
+      }
+     ]
+    }
+   }
+  },
+  "objects": {
+   "data": [
+    {
+     "properties": {
+      "mode": {
+       "expr": {
+        "Literal": {
+         "Value": "'Dropdown'"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "general": [
+    {
+     "properties": {
+      "orientation": {
+       "expr": {
+        "Literal": {
+         "Value": "0D"
+        }
+       }
+      },
+      "selfFilterEnabled": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "header": [
+    {
+     "properties": {
+      "fontFamily": {
+       "expr": {
+        "Literal": {
+         "Value": "'Arial'"
+        }
+       }
+      },
+      "textSize": {
+       "expr": {
+        "Literal": {
+         "Value": "10D"
+        }
+       }
+      },
+      "text": {
+       "expr": {
+        "Literal": {
+         "Value": "'Leader Filter'"
+        }
+       }
+      },
+      "bold": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      },
+      "fontColor": {
+       "solid": {
+        "color": {
+         "expr": {
+          "Literal": {
+           "Value": "'#000000'"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   ],
+   "items": [
+    {
+     "properties": {
+      "textSize": {
+       "expr": {
+        "Literal": {
+         "Value": "8D"
+        }
+       }
+      },
+      "fontFamily": {
+       "expr": {
+        "Literal": {
+         "Value": "'Arial'"
+        }
+       }
+      },
+      "outlineStyle": {
+       "expr": {
+        "Literal": {
+         "Value": "0D"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "selection": [
+    {
+     "properties": {
+      "singleSelect": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      },
+      "selectAllCheckboxEnabled": {
+       "expr": {
+        "Literal": {
+         "Value": "true"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "visualContainerObjects": {
+   "background": [
+    {
+     "properties": {
+      "show": {
+       "expr": {
+        "Literal": {
+         "Value": "false"
+        }
+       }
+      }
+     }
+    }
+   ]
+  },
+  "drillFilterOtherVisuals": true
+ }
+}

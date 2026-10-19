@@ -1,0 +1,67 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='1280' height='720' viewBox='0 0 1280 720'>
+<rect width='1280' height='720' fill='#0F2744'/>
+<text x='40' y='46' font-family='Arial' font-size='26' font-weight='700' fill='#FFFFFF'>How To Guide: International Travel Exposure</text>
+<text x='40' y='72' font-family='Arial' font-size='13' fill='#D6E1EA'>Who is out of the country now and next, for special crime (kidnap and ransom) insurance planning. Created By: ABS Data &amp; Analytics Team.</text>
+<text x='40' y='110' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>TRAVEL STATES (CT, as of the refresh time)</text>
+<text x='40' y='132' font-family='Arial' font-size='12' fill='#FFFFFF'>Current: departure on or before today and return on or</text>
+<text x='52' y='149' font-family='Arial' font-size='12' fill='#FFFFFF'>after today.</text>
+<text x='40' y='169' font-family='Arial' font-size='12' fill='#FFFFFF'>Pending: departure after today. Past: return before today.</text>
+<text x='40' y='189' font-family='Arial' font-size='12' fill='#FFFFFF'>Canceled (Closed Skipped / Closed Incomplete): left out of</text>
+<text x='52' y='206' font-family='Arial' font-size='12' fill='#FFFFFF'>every count, list and the map.</text>
+<text x='40' y='226' font-family='Arial' font-size='12' fill='#FFFFFF'>Bad dates (return before departure) or missing dates: not</text>
+<text x='52' y='243' font-family='Arial' font-size='12' fill='#FFFFFF'>counted; listed on Data Quality.</text>
+<text x='40' y='275' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>HOW COUNTS WORK</text>
+<text x='40' y='297' font-family='Arial' font-size='12' fill='#FFFFFF'>People KPIs = distinct travelers: one person with two</text>
+<text x='52' y='314' font-family='Arial' font-size='12' fill='#FFFFFF'>trips counts once.</text>
+<text x='40' y='334' font-family='Arial' font-size='12' fill='#FFFFFF'>Trip = one ServiceNow request (RITM). A trip to 3</text>
+<text x='52' y='351' font-family='Arial' font-size='12' fill='#FFFFFF'>countries is 1 trip and 3 country visits.</text>
+<text x='40' y='371' font-family='Arial' font-size='12' fill='#FFFFFF'>KPI cards always mean now / scheduled; the Travel state</text>
+<text x='52' y='388' font-family='Arial' font-size='12' fill='#FFFFFF'>slicer changes the map and lists.</text>
+<text x='40' y='408' font-family='Arial' font-size='12' fill='#FFFFFF'>Trips last 12 months = trips active at any point in the 12</text>
+<text x='52' y='425' font-family='Arial' font-size='12' fill='#FFFFFF'>months before the as-of date.</text>
+<text x='40' y='457' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>SOURCE</text>
+<text x='40' y='479' font-family='Arial' font-size='12' fill='#FFFFFF'>ServiceNow catalog items International Travel (ARCO) and</text>
+<text x='52' y='496' font-family='Arial' font-size='12' fill='#FFFFFF'>International Travel (Contractors): the device / access</text>
+<text x='52' y='513' font-family='Arial' font-size='12' fill='#FFFFFF'>request associates submit before leaving the country. Only</text>
+<text x='52' y='530' font-family='Arial' font-size='12' fill='#FFFFFF'>travel submitted there is shown.</text>
+<text x='40' y='550' font-family='Arial' font-size='12' fill='#FFFFFF'>Read from ServiceNow as entered. Family and Division come</text>
+<text x='52' y='567' font-family='Arial' font-size='12' fill='#FFFFFF'>from the associate's HR record.</text>
+<text x='40' y='587' font-family='Arial' font-size='12' fill='#FFFFFF'>Country is free text on the form. A built-in list maps</text>
+<text x='52' y='604' font-family='Arial' font-size='12' fill='#FFFFFF'>spellings, cities and islands to countries (Cancun =</text>
+<text x='52' y='621' font-family='Arial' font-size='12' fill='#FFFFFF'>Mexico, London = United Kingdom); anything else shows as</text>
+<text x='52' y='638' font-family='Arial' font-size='12' fill='#FFFFFF'>Country not recognized.</text>
+<text x='40' y='658' font-family='Arial' font-size='12' fill='#FFFFFF'>Access is limited to approved Risk, Insurance, Security,</text>
+<text x='52' y='675' font-family='Arial' font-size='12' fill='#FFFFFF'>Technology and Data users.</text>
+<text x='680' y='110' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>INDICATORS</text>
+<g transform='translate(680 128) scale(0.9)'><polygon points='7,1 17,1 23,7 23,17 17,23 7,23 1,17 1,7' fill='#D64550'/><rect x='10.6' y='5.5' width='2.8' height='8.6' rx='1.4' fill='#FFFFFF'/><circle cx='12' cy='17.8' r='1.6' fill='#FFFFFF'/></g>
+<text x='712' y='144' font-family='Arial' font-size='12' fill='#FFFFFF'>ACT: fix now (current or upcoming trip)</text>
+<g transform='translate(680 156) scale(0.9)'><path d='M12 1.6 L23 21.4 Q23.3 22.4 22.2 22.4 L1.8 22.4 Q0.7 22.4 1 21.4 Z' fill='#E3B505'/><rect x='10.7' y='8' width='2.6' height='7.4' rx='1.3' fill='#252423'/><circle cx='12' cy='18.6' r='1.5' fill='#252423'/></g>
+<text x='712' y='172' font-family='Arial' font-size='12' fill='#FFFFFF'>WATCH: confirm soon (stay over 90 days, departing in 7 days)</text>
+<g transform='translate(680 184) scale(0.9)'><circle cx='12' cy='12' r='11' fill='#2E7D32'/><path d='M6.8 12.6 L10.3 16 L17.4 8.6' fill='none' stroke='#FFFFFF' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'/></g>
+<text x='712' y='200' font-family='Arial' font-size='12' fill='#FFFFFF'>OK: nothing to fix</text>
+<g transform='translate(680 212) scale(0.9)'><circle cx='12' cy='12' r='11' fill='#6B8F9C'/><circle cx='12' cy='6.8' r='1.6' fill='#FFFFFF'/><rect x='10.6' y='10' width='2.8' height='8.4' rx='1.4' fill='#FFFFFF'/></g>
+<text x='712' y='228' font-family='Arial' font-size='12' fill='#FFFFFF'>CHECK: past record or rule question; never changes the color</text>
+<text x='680' y='258' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>MAP</text>
+<g transform='translate(680 276)'><circle cx='9' cy='9' r='8' fill='#2E75B6'/></g>
+<text x='712' y='290' font-family='Arial' font-size='12' fill='#FFFFFF'>Current: blue (on by default)</text>
+<g transform='translate(680 302)'><polygon points='9,1 17,9 9,17 1,9' fill='#F2C811'/></g>
+<text x='712' y='316' font-family='Arial' font-size='12' fill='#FFFFFF'>Pending: yellow (on by default)</text>
+<g transform='translate(680 328)'><circle cx='9' cy='9' r='6.5' fill='none' stroke='#A6A6A6' stroke-width='3'/></g>
+<text x='712' y='342' font-family='Arial' font-size='12' fill='#FFFFFF'>Past: gray (tick Past in Travel state to show)</text>
+<text x='680' y='358' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'></text>
+<text x='680' y='380' font-family='Arial' font-size='12' fill='#FFFFFF'>Bubble size = travelers. A country with travel in more than</text>
+<text x='692' y='397' font-family='Arial' font-size='12' fill='#FFFFFF'>one state shows a split bubble. Legend, hover text and the</text>
+<text x='692' y='414' font-family='Arial' font-size='12' fill='#FFFFFF'>Countries table (circle / diamond / ring) name the state, so</text>
+<text x='692' y='431' font-family='Arial' font-size='12' fill='#FFFFFF'>color is never the only cue. Select a bubble to filter the</text>
+<text x='692' y='448' font-family='Arial' font-size='12' fill='#FFFFFF'>lists.</text>
+<text x='680' y='480' font-family='Arial' font-size='15' font-weight='700' fill='#7EB6F6'>WHO OWNS THE FIX</text>
+<text x='680' y='502' font-family='Arial' font-size='12' fill='#FFFFFF'>IT support: the specialist assigned to the request (or the IT</text>
+<text x='692' y='519' font-family='Arial' font-size='12' fill='#FFFFFF'>support queue when unassigned). Fixes country and date answers</text>
+<text x='692' y='536' font-family='Arial' font-size='12' fill='#FFFFFF'>with the traveler.</text>
+<text x='680' y='556' font-family='Arial' font-size='12' fill='#FFFFFF'>Katie (Risk / Insurance): decides whether US territory trips</text>
+<text x='692' y='573' font-family='Arial' font-size='12' fill='#FFFFFF'>(Puerto Rico, USVI) count.</text>
+<text x='680' y='593' font-family='Arial' font-size='12' fill='#FFFFFF'>ABS Data &amp; Analytics: matches travelers to associate records</text>
+<text x='692' y='610' font-family='Arial' font-size='12' fill='#FFFFFF'>and adds new country spellings.</text>
+<text x='680' y='630' font-family='Arial' font-size='12' fill='#FFFFFF'>Refresh: daily; the Last Refreshed time is top right. Lists</text>
+<text x='692' y='647' font-family='Arial' font-size='12' fill='#FFFFFF'>export with ... > Export data.</text>
+</svg>

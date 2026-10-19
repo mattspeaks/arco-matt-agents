@@ -48,6 +48,8 @@ export interface AppConfig {
     baseBranch: string | null;
     /** Workspace name → repo folder, where the default (name minus "Acceptance Region") isn't right. */
     workspaceFolders: Record<string, string>;
+    /** The house linter (arco-dwh-powerbi skill): run by the app on each build, branch vs starting point. */
+    lint: { enabled: boolean; python: string; script: string };
     /** Regexes (case-sensitive): workspaces matching none of these count as production (extra confirmation on the card). */
     nonProductionWorkspacePatterns: string[];
     /** Regexes (case-sensitive) for workspaces agents never publish to. */
