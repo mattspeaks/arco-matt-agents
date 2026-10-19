@@ -12,6 +12,7 @@ import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, wai
 import { getCurrentTimesheet, getLanes, getSprintScore, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
+import { catalogStatus, ensureCatalog } from './dwh/catalog.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
@@ -139,6 +140,10 @@ app.get<{ Querystring: { story?: string } }>('/api/fabric/workspaces', async (re
 app.get<{ Params: { id: string }; Querystring: { story: string } }>('/api/fabric/workspaces/:id/reports', async (req) => publishOptions(req.query.story, req.params.id));
 
 app.get('/api/workers', async () => listWorkers());
+
+// The read-only DWH catalog the builder greps (dwh/catalog.ts).
+app.get('/api/catalog', async () => catalogStatus());
+app.post('/api/catalog/refresh', async () => ensureCatalog(true));
 
 // ---- Agent API (called only by the arco MCP server the orchestrator runs) ---------------------
 type AgentBody = Record<string, unknown> & { parentRunId?: string | null };

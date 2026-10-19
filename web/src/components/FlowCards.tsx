@@ -69,6 +69,12 @@ export function ReviewCard({ approval, onError }: { approval: Approval; onError:
         <dd>
           <span className={`tag ${p.qcVerdict === 'PASS' ? 'pass' : p.qcVerdict === 'FAIL' ? 'fail' : 'subtle'}`}>{p.qcVerdict}</span>
         </dd>
+        {p.gaps && (
+          <>
+            <dt>Data gaps</dt>
+            <dd>{p.gaps}</dd>
+          </>
+        )}
         {p.lint && (
           <>
             <dt>House lint</dt>

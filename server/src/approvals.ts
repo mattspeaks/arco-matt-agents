@@ -10,11 +10,11 @@ import { startWorkerRun } from './workers.js';
 // pbi_*: the Power BI story workflow's cards (pbi/flow.ts). pbi_start, pbi_review and pbi_revise also authorise the
 // lane move and acceptance-criteria update they describe, in the chat turn the click starts.
 // time_entry: hours to add to a story's timesheet row, entered on the card (timesheet.ts).
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'time_entry' | 'story_close';
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'pbi_gaps' | 'time_entry' | 'story_close';
 
 /** Cards whose click starts a chat turn that may write to ServiceNow (see /api/agent/write_permit). */
 export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise', 'time_entry', 'story_close'];
-const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish'];
+const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish', 'pbi_gaps'];
 
 export interface Approval {
   id: string;

@@ -318,6 +318,28 @@ rebuild card.
   findings go in the QC report.
 - The builder may run the linter itself before committing (`Bash(py …check_pbir.py:*)`).
 
+### 5.3b Data gaps → new stories (`server/src/dwh/catalog.ts`, `server/scripts/dwh_catalog.py`)
+- **Catalog.** The app keeps a read-only catalog of every gold and silver table, view and column in
+  `data/catalog/{gold,silver}.tsv`. It's built by one fixed `INFORMATION_SCHEMA` query with Matt's `az` identity, takes
+  about 12 s per database, and is rebuilt when more than a day old (before a build loop, or via
+  `POST /api/catalog/refresh`). Agents never get a SQL connection: Matt is db_owner on gold, so the script takes no SQL
+  input.
+- **The builder checks everything the work needs.** It compares against the model TMDL and the gold catalog, and ends
+  its result with a `data-gaps` JSON block listing every gap at its level:
+  - `missing_table`: not in gold;
+  - `missing_column`: on an existing gold table;
+  - `not_in_model`: in gold, not in the semantic model;
+  - `unknown`: couldn't confirm.
+
+  Each gap carries what needs it, a source hint (often from the silver catalog) and whether it's blocking.
+- **The app collects gaps across passes and rounds,** and when the loop ends shows a **Data gaps** card ahead of the
+  Review card. **Draft stories** starts a chat turn (Matt's click) asking the orchestrator to draft VTB stories:
+  - one DWH story per new gold table;
+  - missing columns on the same table together;
+  - the model additions as one Power BI story.
+
+  They go on one approval card, so nothing is created until Matt approves it.
+
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:
 - **Close-out card.** After a publish, the story chat gets Matt's checklist. The default is in

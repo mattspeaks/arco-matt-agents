@@ -13,6 +13,7 @@ import { startWorkerRun } from '../workers.js';
 import { askTimeEntry } from '../timesheet.js';
 import { startCloseout } from '../closeout.js';
 import { lintBranch, lintSummary, type LintDiff } from './lint.js';
+import { catalogPath, ensureCatalog } from '../dwh/catalog.js';
 import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
 import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
@@ -57,6 +58,8 @@ export interface FlowData {
   activeRunId?: string;
   lastBuilder?: string;
   lastQc?: { verdict?: string; result: string };
+  /** Data the work needs that isn't in the semantic model or in gold, as reported by the builder (all rounds). */
+  gaps?: DataGap[];
   /** The house linter on the last build: new errors / warnings vs the starting point. */
   lastLint?: { ran: boolean; newErrors: number; newWarnings: number; preexisting: number };
   /** Head when the Review card went up: later commits are Matt's own edits in Desktop. */
@@ -67,6 +70,59 @@ export interface FlowData {
   prUrl?: string;
   published?: { workspaceId: string; workspaceName: string; reportUrl: string; modelCreated?: boolean; reportCreated: boolean };
   error?: string;
+}
+
+/**
+ * Something the report or model needs that isn't available, from the builder's data-gaps block:
+ * - missing_table: no such table in gold (it has to be built)
+ * - missing_column: the gold table exists but lacks the column
+ * - not_in_model: it's in gold, but not in the semantic model (the model needs the table / column added)
+ * - unknown: the builder couldn't tell (e.g. no catalog)
+ */
+export interface DataGap {
+  kind: 'missing_table' | 'missing_column' | 'not_in_model' | 'unknown';
+  /** gold.schema.table (the one that's missing, or the one lacking the column) */
+  object: string;
+  column?: string;
+  /** What in the report / model needs it */
+  neededFor: string;
+  /** Where the data could come from (e.g. silver.viewpoint.bAPTH.Retainage) */
+  sourceHint?: string;
+  /** The work can't be finished without it */
+  blocking?: boolean;
+  notes?: string;
+}
+
+const GAP_KINDS = ['missing_table', 'missing_column', 'not_in_model', 'unknown'];
+
+/** The builder's ```data-gaps JSON block, validated. Missing or malformed = none reported. */
+export function parseGaps(result: string): DataGap[] {
+  const m = /```data-gaps\s*\n([\s\S]*?)```/.exec(result);
+  if (!m) return [];
+  try {
+    const raw = JSON.parse(m[1]) as Record<string, unknown>[];
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((g) => g && GAP_KINDS.includes(String(g.kind)) && typeof g.object === 'string' && g.object.trim())
+      .map((g) => ({
+        kind: g.kind as DataGap['kind'],
+        object: String(g.object).trim(),
+        column: typeof g.column === 'string' && g.column.trim() ? g.column.trim() : undefined,
+        neededFor: String(g.needed_for ?? g.neededFor ?? '').trim().slice(0, 300),
+        sourceHint: typeof (g.source_hint ?? g.sourceHint) === 'string' ? String(g.source_hint ?? g.sourceHint).trim().slice(0, 200) || undefined : undefined,
+        blocking: Boolean(g.blocking),
+        notes: typeof g.notes === 'string' ? g.notes.trim().slice(0, 300) || undefined : undefined,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+const gapKey = (g: DataGap) => `${g.kind}|${g.object.toLowerCase()}|${(g.column ?? '').toLowerCase()}`;
+function mergeGaps(a: DataGap[] = [], b: DataGap[] = []): DataGap[] {
+  const out = new Map(a.map((g) => [gapKey(g), g]));
+  for (const g of b) out.set(gapKey(g), { ...out.get(gapKey(g)), ...g });
+  return [...out.values()];
 }
 
 interface FlowRow {
@@ -488,6 +544,7 @@ async function raiseReviewCard(story: string, d: FlowData, qc?: { verdict?: stri
       storyNumber: story,
       round: String(d.round),
       qcVerdict: qc?.verdict ?? 'not run',
+      gaps: d.gaps?.length ? `${d.gaps.length} (see the Data gaps card)` : '',
       lint: d.lastLint?.ran ? `${d.lastLint.newErrors} new error(s), ${d.lastLint.newWarnings} new warning(s)` : '',
       summary: (/Summary:\s*([\s\S]*?)(?:\n[A-Z][\w /]+:|$)/.exec(builder)?.[1] ?? builder).trim().slice(0, 1500),
       files: String(changed.length),
@@ -590,6 +647,22 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       await buildLoop(story);
     });
     return 'Approved: rebuilding';
+  }
+
+  if (approval.kind === 'pbi_gaps') {
+    if (!approve) return 'Not now';
+    const gaps = JSON.parse(p.gaps || '[]') as DataGap[];
+    await sendMessage(
+      p.conversationId,
+      [
+        `Draft new VTB stories for the data the ${story} work found missing${note ? ` (${note})` : ''}:`,
+        '',
+        gapsMarkdown(gaps),
+        '',
+        `Group them sensibly: one DWH story per new gold table, missing columns on the same gold table together, and the semantic-model additions as one Power BI story. Follow the servicenow skill's creating recipe: each story says what's needed, why (${story}), where the data likely comes from, and acceptance criteria listing the tables and columns. Tag DWH work #DWH (#NewTable for a new table) and model work #SemanticModel, and mention ${story} in each description. Put them all on one approval card and end your turn.`,
+      ].join('\n'),
+    );
+    return 'Approved: the orchestrator is drafting the stories';
   }
 
   if (approval.kind === 'pbi_publish') {
@@ -727,13 +800,17 @@ async function buildLoop(story: string) {
   let builder = '';
   let qc: { verdict?: string; result: string } = { result: '' };
   let lint: LintDiff | undefined;
+  let gaps: DataGap[] = [];
+  // The builder checks what the work needs against gold; the catalog is rebuilt when it's more than a day old.
+  const catalog = await ensureCatalog();
 
   for (let pass = 1; pass <= 3; pass++) {
     await postAppNote(data.conversationId, `Builder pass ${pass}${label} started.`);
-    const b = await runWorker('pbi-builder', builderBrief(story, data, pass, findings), story, wt);
+    const b = await runWorker('pbi-builder', builderBrief(story, data, pass, findings, catalog), story, wt);
     if (!b) return;
     if (b.status !== 'succeeded') throw new Error(`Builder pass ${pass} ${b.status}${b.error ? `: ${b.error}` : ''}`);
     builder = b.result ?? '';
+    gaps = mergeGaps(gaps, parseGaps(builder));
     await commitAll(wt, `${story}: builder pass ${pass} (changes the builder left uncommitted)`);
 
     const files = await changedFiles(wt, base);
@@ -754,8 +831,10 @@ async function buildLoop(story: string) {
 
   const current = await getFlow(story);
   if (current?.stage !== 'building') return;
-  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint) };
+  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint), gaps: mergeGaps(current.data.gaps, gaps) };
   await saveFlow(story, 'review', next);
+  // Missing data comes first, so it's in front of Matt before he reviews what the builder could do without it.
+  if (gaps.length) await raiseGapsCard(story, next, gaps);
   await raiseReviewCard(story, next, qc);
 }
 
@@ -772,7 +851,7 @@ function withLint<T extends { verdict?: string; result: string }>(qc: T, lint: L
 
 const lintCounts = (l: LintDiff) => ({ ran: l.ran, newErrors: l.newErrors.length, newWarnings: l.newWarnings.length, preexisting: l.preexisting.errors + l.preexisting.warnings });
 
-function builderBrief(story: string, d: FlowData, pass: number, findings?: string): string {
+function builderBrief(story: string, d: FlowData, pass: number, findings?: string, catalog: { db: string; path: string; asOf: string | null; error?: string }[] = []): string {
   const wt = d.worktree!;
   return [
     pass === 1 && d.round === 1
@@ -789,6 +868,7 @@ function builderBrief(story: string, d: FlowData, pass: number, findings?: strin
       `- Report: ${join(wt, d.reportDir!)}. Keep its current format (PBIR-Legacy report.json or PBIR definition/).`,
       d.modelDir ? `- Semantic model (TMDL): ${join(wt, d.modelDir)}` : `- No semantic model in the repo: ${d.thinReportNote ?? 'thin report'} Report changes only; say so if the plan needs model changes.`,
       `- Work only in those folders. Commit with \`git -C "${wt}" commit\` and a message starting with ${story}. Don't push.`,
+      `- What gold has: ${catalog.filter((c) => c.asOf).map((c) => `\`${c.path}\` (${c.db}, as of ${c.asOf!.slice(0, 16).replace('T', ' ')} UTC)`).join(' and ') || 'no catalog available: report gaps you can\'t confirm as kind "unknown"'}. Tab-separated: object (db.schema.table), kind, column, type. Grep it to check every table and column the work needs.`,
       `- House linter: before you commit, run \`py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py "${join(wt, d.reportDir!)}"\` and fix every ERROR your change introduced. Errors that were there before the branch are out of scope unless the plan says otherwise. The app runs it too, and new errors fail QC.`,
     ].join('\n'),
   ]
@@ -1122,4 +1202,37 @@ export async function requestPublish(p: { parentRunId?: string | null }) {
   await saveFlow(storyNumber, 'final_qc', { ...flow.data, reviewSha: flow.data.reviewSha ?? head });
   void pipeline(storyNumber, '', () => finalQc(storyNumber));
   return { status: 'final QC running', note: 'The branch changed since the last final QC (or there was none), so QC runs first; the Publish card follows. End your turn.' };
+}
+
+const GAP_LABEL: Record<DataGap['kind'], string> = {
+  missing_table: 'Table not in gold',
+  missing_column: 'Column missing from a gold table',
+  not_in_model: 'In gold, not in the semantic model',
+  unknown: "Couldn't confirm",
+};
+
+export function gapsMarkdown(gaps: DataGap[]): string {
+  const order: DataGap['kind'][] = ['missing_table', 'missing_column', 'not_in_model', 'unknown'];
+  return order
+    .filter((k) => gaps.some((g) => g.kind === k))
+    .map((k) =>
+      [
+        `**${GAP_LABEL[k]}**`,
+        ...gaps
+          .filter((g) => g.kind === k)
+          .map((g) => `- \`${g.object}${g.column ? `.${g.column}` : ''}\`${g.blocking ? ' (blocking)' : ''}: ${g.neededFor || 'needed by the work'}${g.sourceHint ? `. Source: ${g.sourceHint}` : ''}${g.notes ? `. ${g.notes}` : ''}`),
+      ].join('\n'),
+    )
+    .join('\n\n');
+}
+
+/** The Data gaps card: everything the builder found missing, and a button that asks the orchestrator to draft stories. */
+async function raiseGapsCard(story: string, d: FlowData, gaps: DataGap[]) {
+  const card = await createApproval({
+    kind: 'pbi_gaps',
+    title: `${story}: ${gaps.length} data gap${gaps.length === 1 ? '' : 's'} found${gaps.some((g) => g.blocking) ? ' (some blocking)' : ''}`,
+    payload: { conversationId: d.conversationId, storyNumber: story, gaps: JSON.stringify(gaps), preview: gapsMarkdown(gaps) },
+    requestedByRunId: null,
+  });
+  await postApprovalCard(d.conversationId, card.id);
 }

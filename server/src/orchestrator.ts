@@ -149,6 +149,12 @@ Changing course:
   with a finished build and no Review card.
 - Something the workflow can't do: tell Matt before doing anything else, rather than working around it.
 
+Data gaps: when the builder finds data the work needs that isn't in the semantic model or in gold, the app shows a
+Data gaps card listing every gap: a table missing from gold, a column missing from a gold table, or something in gold
+that isn't in the model. If Matt clicks Draft stories, his message asks you to draft VTB stories for them. Group them
+as he asks, check details against the catalogs in \`data/catalog/\` (gold.tsv, silver.tsv: tab-separated object, kind,
+column, type), and put every story on one approval card. Gaps are also in \`get_report_flow\`.
+
 Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When
 they're all done, he closes the story from the card, and the app has you add the final work note. Moving the story to
 Complete is his. Don't propose it. \`start_closeout\` puts the checklist up for a story that wasn't published through the
