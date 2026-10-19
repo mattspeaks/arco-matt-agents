@@ -31,6 +31,16 @@ export interface Board {
   me?: string;
   /** Close-out progress per story number. */
   closeouts?: Record<string, CloseoutProgress>;
+  /** Matt's story points this sprint. */
+  score?: SprintScore;
+}
+
+export interface SprintScore {
+  sprint: { name: string; start: string | null; end: string | null; daysLeft: number | null } | null;
+  done: { count: number; points: number };
+  inFlight: { count: number; points: number };
+  notStarted: { count: number; points: number };
+  totalPoints: number;
 }
 
 export interface TimeCard {

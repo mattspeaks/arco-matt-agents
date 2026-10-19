@@ -149,4 +149,12 @@ export const SCHEMA: string[] = [
      closed_at    DATETIME2     NULL
    )`,
   `IF COL_LENGTH('dbo.conversations', 'archived_at') IS NULL ALTER TABLE dbo.conversations ADD archived_at DATETIME2 NULL`,
+
+  // Sprint dates (from the board snapshot), for the sprint scoreboard.
+  `IF OBJECT_ID('dbo.sprints') IS NULL CREATE TABLE dbo.sprints (
+     name       NVARCHAR(200) NOT NULL PRIMARY KEY,
+     start_date DATE          NULL,
+     end_date   DATE          NULL,
+     synced_at  DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
+   )`,
 ];

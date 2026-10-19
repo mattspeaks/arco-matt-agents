@@ -7,6 +7,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { ActivityPanel } from './components/ActivityPanel';
 import { RunDrawer } from './components/RunDrawer';
 import { StoryDrawer } from './components/StoryDrawer';
+import { Scoreboard } from './components/Scoreboard';
 
 function upsert<T extends { id: string }>(list: T[], item: T, prepend = true): T[] {
   const i = list.findIndex((x) => x.id === item.id);
@@ -89,6 +90,7 @@ export function App() {
           <span className="brand-mark" aria-hidden>◆</span>
           <span>ARCO Agents</span>
         </div>
+        {board?.score && <Scoreboard score={board.score} />}
         <div className="topbar-right">
           <span className="muted small">Board synced {fmtTime(board?.syncedAt)}</span>
           <button className="btn" onClick={startSync} disabled={!!syncRun}>

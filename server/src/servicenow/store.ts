@@ -144,6 +144,8 @@ export interface BoardSnapshot {
     sys_id: string; number: string; title: string; state_value: string; state_label: string; priority: string;
     assigned_to: string; sprint: string; points: string; updated: string; tags: string[];
   }[];
+  /** The board's sprints with their dates (YYYY-MM-DD); older snapshots don't have it. */
+  sprints?: { name: string; start: string; end: string }[];
 }
 /** One story in full (after an edit, or when reading a story): the only snapshot with description and criteria. */
 export interface StorySnapshot {
@@ -201,6 +203,16 @@ export async function saveBoardSnapshot(p: BoardSnapshot): Promise<number> {
      WHEN NOT MATCHED BY SOURCE THEN UPDATE SET on_board = 0;`,
     [JSON.stringify(rows)],
   );
+  for (const sp of p.sprints ?? []) {
+    if (!sp.name) continue;
+    const date = (s: string) => (/^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null);
+    await query(
+      `MERGE dbo.sprints AS t USING (SELECT ? AS name) AS s ON t.name = s.name
+       WHEN MATCHED THEN UPDATE SET start_date = ?, end_date = ?, synced_at = SYSUTCDATETIME()
+       WHEN NOT MATCHED THEN INSERT (name, start_date, end_date) VALUES (?, ?, ?);`,
+      [sp.name, date(sp.start), date(sp.end), sp.name, date(sp.start), date(sp.end)],
+    );
+  }
   return rows.length;
 }
 
@@ -325,4 +337,59 @@ export async function lastSyncAt(): Promise<string | null> {
   // The board snapshot stamps every on-board story, so the newest stamp is the last refresh.
   const row = await queryOne<{ t: string | null }>('SELECT MAX(synced_at) AS t FROM dbo.stories WHERE on_board = 1');
   return row?.t ?? null;
+}
+
+// Lanes by state value (servicenow skill): Complete counts as done, Cancelled doesn't count, everything from Work in
+// progress to Deploy/Launch is in flight, and Backlog / Draft / Ready haven't started.
+const DONE = ['3'];
+const CANCELLED = ['4'];
+const IN_FLIGHT = ['2', '-7', '-8', '10'];
+
+export interface SprintScore {
+  sprint: { name: string; start: string | null; end: string | null; daysLeft: number | null } | null;
+  done: { count: number; points: number };
+  inFlight: { count: number; points: number };
+  notStarted: { count: number; points: number };
+  totalPoints: number;
+}
+
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Sprint dates from the last board sync, or from a name like "Sprint 26-10-12" (start date; sprints run 2 weeks). */
+async function sprintDates(name: string): Promise<{ start: string | null; end: string | null }> {
+  const row = await queryOne<{ start_date: Date | null; end_date: Date | null }>('SELECT start_date, end_date FROM dbo.sprints WHERE name = ?', [name]);
+  if (row?.start_date && row.end_date) return { start: new Date(row.start_date).toISOString().slice(0, 10), end: new Date(row.end_date).toISOString().slice(0, 10) };
+  const m = /(\d{2})-(\d{2})-(\d{2})\s*$/.exec(name);
+  if (!m) return { start: null, end: null };
+  const start = new Date(2000 + Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const end = new Date(start);
+  end.setDate(start.getDate() + 13);
+  return { start: ymd(start), end: ymd(end) };
+}
+
+/** Matt's story points this sprint: done, in flight and not started (stories on the current-sprint board). */
+export async function getSprintScore(me: string): Promise<SprintScore> {
+  const rows = await query<{ sprint: string | null; state_value: string | null; story_points: string | null }>(
+    'SELECT sprint, state_value, story_points FROM dbo.stories WHERE on_board = 1 AND assigned_to = ?',
+    [me],
+  );
+  const score: SprintScore = { sprint: null, done: { count: 0, points: 0 }, inFlight: { count: 0, points: 0 }, notStarted: { count: 0, points: 0 }, totalPoints: 0 };
+  const sprintCounts = new Map<string, number>();
+  for (const r of rows) {
+    const state = r.state_value ?? '';
+    if (CANCELLED.includes(state)) continue;
+    const pts = Number.parseFloat(r.story_points ?? '') || 0;
+    const bucket = DONE.includes(state) ? score.done : IN_FLIGHT.includes(state) ? score.inFlight : score.notStarted;
+    bucket.count++;
+    bucket.points += pts;
+    score.totalPoints += pts;
+    if (r.sprint) sprintCounts.set(r.sprint, (sprintCounts.get(r.sprint) ?? 0) + 1);
+  }
+  const name = [...sprintCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (name) {
+    const { start, end } = await sprintDates(name);
+    const daysLeft = end ? Math.max(0, Math.round((new Date(`${end}T00:00:00`).getTime() - new Date(`${ymd(new Date())}T00:00:00`).getTime()) / 86_400_000) + 1) : null;
+    score.sprint = { name, start, end, daysLeft };
+  }
+  return score;
 }

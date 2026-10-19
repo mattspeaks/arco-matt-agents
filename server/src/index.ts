@@ -9,7 +9,7 @@ import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, op
 import { proposeLesson } from './lessons.js';
 import { archiveConversation, createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
-import { getCurrentTimesheet, getLanes, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
+import { getCurrentTimesheet, getLanes, getSprintScore, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
@@ -55,8 +55,8 @@ app.get('/ws', { websocket: true }, (socket) => {
 
 // ---- UI API -------------------------------------------------------------------------------------
 app.get('/api/board', async () => {
-  const [stories, lanes, syncedAt, closeouts] = await Promise.all([listStories(), getLanes(), lastSyncAt(), closeoutSummary()]);
-  return { stories, lanes, syncedAt, closeouts, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl, me: config.servicenow.myName };
+  const [stories, lanes, syncedAt, closeouts, score] = await Promise.all([listStories(), getLanes(), lastSyncAt(), closeoutSummary(), getSprintScore(config.servicenow.myName)]);
+  return { stories, lanes, syncedAt, closeouts, score, laneMapping: config.servicenow.lanes, instanceUrl: config.servicenow.instanceUrl, me: config.servicenow.myName };
 });
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;

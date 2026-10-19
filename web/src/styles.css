@@ -335,3 +335,19 @@ pre.note {
 }
 .closeout-pop .approval { margin: 0; }
 .closeout-pop-close { position: absolute; top: 10px; right: 10px; z-index: 1; padding: 2px 8px; }
+/* Sprint scoreboard (top centre) */
+.scoreboard { display: flex; align-items: center; gap: 14px; margin: 0 auto; padding: 4px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-2); min-width: 0; }
+.score-sprint { line-height: 1.2; white-space: nowrap; }
+.score-bar { position: relative; width: 120px; height: 8px; border-radius: 999px; background: var(--border); overflow: visible; flex-shrink: 0; }
+.score-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--ok), var(--accent)); transition: width 0.6s ease; }
+.score-time { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--muted); border-radius: 1px; }
+.score-done { position: relative; white-space: nowrap; }
+.score-big { font-size: 20px; font-weight: 700; color: var(--ok); }
+.score-done.bump .score-big { animation: score-pop 0.6s ease; display: inline-block; }
+.score-plus { position: absolute; top: -10px; right: -18px; font-weight: 700; color: var(--ok); animation: score-float 2.4s ease forwards; }
+.score-stat { white-space: nowrap; color: var(--muted); }
+.score-stat .strong { color: var(--text); font-size: 15px; }
+@keyframes score-pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes score-float { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+@media (max-width: 1100px) { .score-sprint, .score-bar { display: none; } }
+@media (max-width: 760px) { .scoreboard { display: none; } }

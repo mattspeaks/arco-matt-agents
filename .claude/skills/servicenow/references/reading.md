@@ -17,8 +17,12 @@ const G = 'd2ab7f44472d21102a2bef4d646d4329';
 const rows = await SN(`/api/now/table/rm_story?sysparm_query=sprint.state=2^assignment_group=${G}^ORDERBYnumber&sysparm_display_value=all&sysparm_exclude_reference_link=true&sysparm_limit=300&sysparm_fields=sys_id,number,short_description,description,state,priority,assigned_to,sprint,story_points,sys_updated_on`);
 const v = (f) => f?.value ?? '', d = (f) => f?.display_value ?? '';
 const id = (f) => v(f).replace(/^(.{8})(.{4})(.{4})(.{4})/, '$1-$2-$3-$4-'); // dashed, or the extension blanks it
+// The sprints' dates, for the app's sprint scoreboard.
+const sprintIds = [...new Set(rows.map((s) => v(s.sprint)).filter(Boolean))];
+const sprints = sprintIds.length ? await SN(`/api/now/table/rm_sprint?sysparm_query=sys_idIN${sprintIds.join(',')}&sysparm_fields=short_description,start_date,end_date`) : [];
 ({
   __arco: 'board-v2',
+  sprints: sprints.map((p) => ({ name: p.short_description, start: String(p.start_date).slice(0, 10), end: String(p.end_date).slice(0, 10) })),
   stories: rows.map((s) => ({
     sys_id: id(s.sys_id), number: v(s.number), title: d(s.short_description),
     state_value: v(s.state), state_label: d(s.state), priority: d(s.priority), assigned_to: d(s.assigned_to),
