@@ -133,7 +133,8 @@ ${REPORT_WORKFLOW}`
     : `
 
 ## This conversation: main chat
-General work: the board as a whole, timesheet, creating and triaging stories, questions. When Matt starts real work
+General work: the board as a whole, timesheet, creating stories (servicenow skill, references/creating.md) and
+triaging them, questions. When Matt starts real work
 on a specific story, suggest its story chat ("Discuss with orchestrator" on the story) so that story's work stays
 together.`;
   return `${base}${scope}

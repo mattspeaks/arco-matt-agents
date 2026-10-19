@@ -1,7 +1,8 @@
 // PreToolUse hook for the orchestrator's Claude in Chrome javascript_tool calls.
 // Hard guardrails on ServiceNow writes, whatever the model writes (ARCHITECTURE.md §9):
 //   - no DELETE/PUT, and writes only to rm_story and time_card
-//   - story state only to the allow-listed lanes (config: servicenow.agentAllowedStateValues)
+//   - story state only to the allow-listed lanes (config: servicenow.agentAllowedStateValues); a new story may
+//     start only in servicenow.agentCreateStateValues, and is created in its own call
 //   - never change the time_sheet record or a time card's state (submitting is Matt's)
 //   - no form submits from script
 //   - only in the turn Matt started by clicking Approve on an approval card (asks the app: /api/agent/write_permit)
@@ -13,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const config = JSON.parse(readFileSync(resolve(here, '../../config/app.config.json'), 'utf8'));
 const allowedStates = new Set((config.servicenow.agentAllowedStateValues ?? []).map(String));
+const createStates = new Set((config.servicenow.agentCreateStateValues ?? []).map(String));
 
 let input = '';
 process.stdin.on('data', (d) => (input += d));
@@ -44,9 +46,14 @@ process.stdin.on('end', () => {
   // Lookup tables may be queried (?sysparm_query=...) in a write snippet, never addressed by record path.
   if (/\/api\/now\/table\/(task|sys_user)\//.test(code)) block('task and sys_user records are read-only');
 
+  // Creating a story: POST to the rm_story collection (no record id), kept apart from updates to existing stories.
+  const creatingStory = writes.includes('POST') && /\/api\/now\/table\/rm_story(?![\/\w])/.test(code);
+  if (creatingStory && (writes.includes('PATCH') || /\/api\/now\/table\/rm_story\//.test(code))) block('create stories in their own call, separate from updates to existing stories');
+  const laneSet = creatingStory ? createStates : allowedStates;
+
   const states = [...code.matchAll(/['"]?\bstate['"]?\s*:\s*['"`]?(-?\d+)/g)].map((m) => m[1]);
   if (tables.has('time_card') && /['"]?\bstate['"]?\s*:/.test(code)) block("a time card's state is never changed (Matt submits)");
-  for (const s of states) if (!allowedStates.has(s)) block(`story state ${s} is Matt's lane; agents may only set ${[...allowedStates].join(', ')}`);
+  for (const s of states) if (!laneSet.has(s)) block(creatingStory ? `a new story may only start in states ${[...createStates].join(', ')}` : `story state ${s} is Matt's lane; agents may only set ${[...allowedStates].join(', ')}`);
   if (tables.has('rm_story') && /['"]?\bstate['"]?\s*:\s*[^'"`\-\d\s]/.test(code)) block('write story state as a literal value so it can be checked');
 
   // Writes only happen in the turn Matt started by clicking Approve on the card (request_approval).

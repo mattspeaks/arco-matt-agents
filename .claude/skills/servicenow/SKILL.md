@@ -1,6 +1,6 @@
 ---
 name: servicenow
-description: Read and update Matt's ServiceNow work through Claude in Chrome. Covers the ABS Data and Analytics VTB (rm_story stories, lanes, work notes) and Matt's own timesheet (time_sheet / time_card hours). Use whenever Matt asks what's on the board or in a lane, about a STRY number, about his hours, or wants to move a card, add a work note, or log or change time. Also use it to refresh the app's board and timesheet copy.
+description: Read and update Matt's ServiceNow work through Claude in Chrome. Covers the ABS Data and Analytics VTB (rm_story stories, lanes, work notes) and Matt's own timesheet (time_sheet / time_card hours). Use whenever Matt asks what's on the board or in a lane, about a STRY number, about his hours, or wants to create a story (including turning notes or a conversation into stories), move a card, add a work note, or log or change time. Also use it to refresh the app's board and timesheet copy.
 ---
 # ServiceNow (ABS Data and Analytics board + Matt's timesheet)
 
@@ -20,9 +20,9 @@ calls against ServiceNow's Table API from inside a ServiceNow tab, authenticated
 ### Lanes (`rm_story.state`)
 | Value | Lane | Who moves it |
 |---|---|---|
-| -10 | Backlog | Matt |
-| -6 | Draft | Matt |
-| 1 | Ready | Matt. Ready + a routing hashtag (#PowerBI, #DWH, …) means "ready for an agent" |
+| -10 | Backlog | Matt. The default lane for a story you create |
+| -6 | Draft | Matt (a story you create may start here if he says so) |
+| 1 | Ready | Matt (a story you create may start here if he says so). Ready + a routing hashtag (#PowerBI, #DWH, …) means "ready for an agent" |
 | 2 | Work in progress | **You may move here** (agent started, or needs info, with a work note) |
 | -7 | Ready for testing | **You may move here** (agent work done and QC passed). Confirm the PATCH returns "Ready for testing" |
 | -8 | Testing | Matt only |
@@ -78,6 +78,7 @@ window.SN = async (path, opts = {}) => {
 
 ## What to read next
 - Questions about the board, a story, or hours, or refreshing the app's copy: `references/reading.md`
+- Creating stories, including from notes or a conversation: `references/creating.md`
 - Moving a card, adding a work note, logging or changing hours: `references/writing.md`
 
 ## Work note template (agent work)

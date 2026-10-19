@@ -18,6 +18,7 @@
     },
     "agentAllowedTargetStates": ["Work in progress", "Ready for testing"],
     "agentAllowedStateValues": ["2", "-7"],
+    "agentCreateStateValues": ["-10", "-6", "1"],
     "laneOrder": [
       "Backlog",
       "Draft",

@@ -360,7 +360,7 @@ sequenceDiagram
 | Area | Control |
 |---|---|
 | Production | No PROD credentials; never publish or update Power BI apps (Matt does) |
-| ServiceNow | Done only in the chat Matt is typing in, never by background sessions. Every write is previewed and needs Matt's "yes". The write guard hook blocks other lanes, deletes, other tables, and timesheet submission |
+| ServiceNow | Done only in the chat Matt is typing in, never by background sessions. Every write is previewed and needs Matt's "yes". The write guard hook blocks other lanes, deletes, other tables, and timesheet submission. New stories (`references/creating.md`) may start only in Backlog, Draft or Ready (`agentCreateStateValues`), and are created in a call of their own |
 | Git | Builders commit to `agent/*` branches only (in a per-story worktree); push, merge, reset and rebase are denied to them. The app pushes the branch and opens a PR only after Matt confirms the Publish card. Nothing ever merges; Matt does |
 | Fabric | The app publishes only after Matt picks the workspace on the Publish card, and only to workspaces he can access. Names matching `powerbi.blockedWorkspacePatterns` (TEST, PROD, Production, UAT) are refused. Apps are never published or updated |
 | QC | The orchestrator must run QC after every builder run before proposing review |

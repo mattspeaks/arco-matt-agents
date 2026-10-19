@@ -28,6 +28,8 @@ export interface AppConfig {
     lanes: { ready: string; agentInProgress: string; agentReview: string };
     agentAllowedTargetStates: string[];
     agentAllowedStateValues: string[];
+    /** Lanes a newly created story may start in (Backlog, Draft, Ready). */
+    agentCreateStateValues: string[];
     laneOrder: string[];
   };
   claude: { bin: string; syncModel: string; orchestratorModel: string; defaultWorkerModel: string };
