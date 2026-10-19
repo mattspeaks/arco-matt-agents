@@ -316,7 +316,7 @@ export function TimeEntryCard({ approval, onError }: { approval: Approval; onErr
         <>
           {weeks.length > 1 && (
             <div className="week-switch" role="tablist" aria-label="Week">
-              {weeks.map((w) => (
+              {[...weeks].reverse().map((w) => (
                 <button key={w.start} role="tab" aria-selected={w.start === current.start} className={`btn small ${w.start === current.start ? 'primary' : 'ghost'}`} onClick={() => setWeekStart(w.start)}>
                   {w.label}
                 </button>
