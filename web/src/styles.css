@@ -323,3 +323,5 @@ pre.note {
 .checklist-note .input { flex: 1; margin: 0; }
 .approval.closeout.closed { opacity: 0.85; }
 .archived-banner { padding: 6px 12px; background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid var(--border); }
+.prod-confirm { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; padding: 6px 8px; border-radius: var(--radius); background: var(--bad-soft); }
+.prod-confirm input { margin-top: 3px; }

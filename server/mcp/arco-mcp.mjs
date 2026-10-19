@@ -205,6 +205,15 @@ server.registerTool(
 );
 
 server.registerTool(
+  'request_publish',
+  {
+    description:
+      "Story chats only. Puts a Publish card up for the story's report as it is now, e.g. to publish it again or to production after Acceptance. Matt picks the workspace (production ones need his extra tick) and the report to update. If anything changed since the last final QC, QC runs first and the card follows. Never publishes an app. END YOUR TURN after calling it.",
+  },
+  () => call('request_publish'),
+);
+
+server.registerTool(
   'stop_report_work',
   {
     description: "Story chats only. Stops the story's running builder/QC loop (e.g. Matt says wait, or something's wrong). The branch keeps what was committed. No card needed.",

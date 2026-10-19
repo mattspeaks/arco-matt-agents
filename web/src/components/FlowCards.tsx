@@ -108,6 +108,7 @@ interface Target {
   id: string;
   name: string;
   blocked: boolean;
+  production?: boolean;
 }
 
 interface ReportOption {
@@ -128,6 +129,7 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
   const [reports] = useCardState<ReportOption[] | null>(id, 'reports', null);
   const [reportId, setReportId] = useCardState(id, 'reportId', ''); // '' = create a new report
   const [name, setName] = useCardState(id, 'name', p.reportName ?? '');
+  const [confirmProd, setConfirmProd] = useCardState(id, 'confirmProduction', false);
   const pending = approval.status === 'pending';
   const story = encodeURIComponent(p.storyNumber ?? '');
 
@@ -135,6 +137,7 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
   // story's report should update. Only a real pick resets the report and name, never a second copy of the card.
   const selectWorkspace = (wsId: string) => {
     setCardValue(id, 'workspaceId', wsId);
+    setCardValue(id, 'confirmProduction', false); // a new pick needs a new confirmation
     setCardValue<ReportOption[] | null>(id, 'reports', null);
     if (!wsId) return;
     loadOnce(`${id}:reports:${wsId}`, () => api<{ reports: ReportOption[]; match: string; repoName: string }>(`/api/fabric/workspaces/${wsId}/reports?story=${story}`))
@@ -163,6 +166,7 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
   const trimmed = name.trim();
   const nameError = !trimmed ? 'Enter a name' : BAD_NAME.test(trimmed) ? 'No < > : " / \\ | ? *' : '';
   const wsName = targets?.find((w) => w.id === workspaceId)?.name;
+  const production = !!targets?.find((w) => w.id === workspaceId)?.production;
 
   return (
     <div className="approval pbi_publish">
@@ -192,7 +196,8 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
               <option key={w.id} value={w.id} disabled={w.blocked}>
                 {w.name}
                 {w.id === suggested ? '  (suggested)' : ''}
-                {w.blocked ? ' (TEST/PROD: not allowed)' : ''}
+                {w.production ? '  · production' : ''}
+                {w.blocked ? ' (blocked)' : ''}
               </option>
             ))}
           </select>
@@ -260,9 +265,23 @@ export function PublishCard({ approval, onError }: { approval: Approval; onError
             </>
           )}
 
+          {workspaceId && production && (
+            <label className="prod-confirm small">
+              <input type="checkbox" checked={confirmProd} onChange={(e) => setConfirmProd(e.target.checked)} />
+              <span>
+                Publish to production (<strong>{wsName}</strong>). Workspace users see it right away; the app only changes when you publish the app.
+              </span>
+            </label>
+          )}
+          {p.published && <p className="small muted">Already published to {p.published}.</p>}
           <div className="approval-actions">
-            <button className="btn primary" disabled={busy || !workspaceId || !reports || !!nameError} onClick={() => void decide(true, { workspaceId, reportId, name: trimmed })}>
-              Publish + open PR
+            <button
+              className={`btn ${production ? 'danger' : 'primary'}`}
+              disabled={busy || !workspaceId || !reports || !!nameError || (production && !confirmProd)}
+              onClick={() => void decide(true, { workspaceId, reportId, name: trimmed, confirmProduction: production && confirmProd })}
+            >
+              {production ? 'Publish to production' : 'Publish'}
+              {p.published ? '' : ' + open PR'}
             </button>
             <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
               Not now

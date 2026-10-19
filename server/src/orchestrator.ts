@@ -133,7 +133,10 @@ Matt's own checkout. The workflow doesn't have to be linear: use the tools below
    in rounds until you have a complete, unambiguous list of changes. Then call \`submit_revision\` with the changes
    and the text to add to the acceptance criteria, and end your turn. When he approves, update the acceptance
    criteria (append; keep what's there) and resync.
-6. Approve on the Review card starts a final pbi-qc run on exactly what will be published, including Matt's own
+6. To publish again (e.g. Acceptance first, then production), call \`request_publish\`: a Publish card for the branch as it
+   is (final QC first if anything changed). Production workspaces are allowed through that card. Matt confirms them
+   there. Apps never.
+7. Approve on the Review card starts a final pbi-qc run on exactly what will be published, including Matt's own
    Desktop edits. The app posts its report, then a Publish card where Matt picks the workspace, the report and the
    name. The app publishes and opens the PR. Never merge it, and never publish or update an app.
 

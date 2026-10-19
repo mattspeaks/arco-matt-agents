@@ -5,7 +5,7 @@ import { config } from './config.js';
 import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
 import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
-import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
+import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestPublish, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
 import { archiveConversation, createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
@@ -117,10 +117,10 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string } }>(
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean } }>(
   '/api/approvals/:id/decision',
   async (req) =>
-    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart }),
+    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart, confirmProduction: req.body?.confirmProduction === true }),
 );
 
 // ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------
@@ -271,6 +271,7 @@ app.post<{ Body: AgentBody }>('/api/agent/attach_report_work', async (req) => {
   if (!branch) throw bad('branch is required');
   return agentCall(() => attachReportWork({ parentRunId: req.body.parentRunId, branch, repoReport: str(req.body.repo_report), plan: str(req.body.plan) }));
 });
+app.post<{ Body: AgentBody }>('/api/agent/request_publish', async (req) => agentCall(() => requestPublish({ parentRunId: req.body.parentRunId })));
 app.post<{ Body: AgentBody }>('/api/agent/request_review', async (req) => agentCall(() => requestReview({ parentRunId: req.body.parentRunId, summary: str(req.body.summary) })));
 app.post<{ Body: AgentBody }>('/api/agent/ask_time_entry', async (req) => {
   const run = req.body.parentRunId ? await getRun(req.body.parentRunId) : undefined;

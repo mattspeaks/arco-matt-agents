@@ -51,6 +51,7 @@
     "worktreeRoot": "C:/Users/mspeaks/source/repos/PowerBI-agent-worktrees",
     "baseBranch": null,
     "workspaceFolders": {},
+    "nonProductionWorkspacePatterns": ["Acceptance", "Development", "\\bDEV\\b", "\\bDev\\b", "\\bTest\\b", "\\bPOC\\b", "Sandbox"],
     "blockedWorkspacePatterns": ["\\bTEST\\b", "\\bPROD\\b", "\\bProduction\\b", "\\bUAT\\b"]
   },
   "workers": {

@@ -3,7 +3,9 @@
 Project rules for every Claude session in this repo: the orchestrator, workers, and anyone developing the app.
 
 ## Guardrails (non-negotiable)
-- Never deploy to TEST or PROD Fabric workspaces, and never publish or update a Power BI **app**. Matt does that.
+- Reports reach any Fabric workspace, production included, only through a Publish card Matt approves (the app
+  publishes; production needs his extra confirmation on the card). Never publish or update a Power BI **app**: Matt
+  does that.
 - Never move a ServiceNow story to Testing, Deploy/Launch, Complete or Cancelled. Agents only *propose* changes
   through the app, and Matt approves them.
 - ServiceNow is touched only in the orchestrator chat, in response to Matt's own messages, following the

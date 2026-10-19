@@ -101,6 +101,8 @@ const diffBase = (d: FlowData) => d.baseSha ?? d.pullSha;
 // ---- workspaces ---------------------------------------------------------------------------------
 
 const isBlocked = (name: string) => config.powerbi.blockedWorkspacePatterns.some((p) => new RegExp(p).test(name));
+/** Production = not blocked and not recognisably Acceptance/Dev/Test/POC/Sandbox. Publishing there needs Matt's extra confirmation. */
+const isProduction = (name: string) => !isBlocked(name) && !config.powerbi.nonProductionWorkspacePatterns.some((p) => new RegExp(p).test(name));
 
 let wsCache: { at: number; list: Workspace[] } | null = null;
 async function workspaces(): Promise<Workspace[]> {
@@ -118,7 +120,7 @@ async function findWorkspace(idOrName: string): Promise<Workspace> {
 /** For the Publish card's dropdown: every workspace Matt can access, TEST/PROD ones flagged and not selectable. */
 export async function publishTargets(storyNumber?: string) {
   const flow = storyNumber ? await getFlow(storyNumber) : undefined;
-  const list = (await workspaces()).map((w) => ({ id: w.id, name: w.displayName.trim(), blocked: isBlocked(w.displayName) }));
+  const list = (await workspaces()).map((w) => ({ id: w.id, name: w.displayName.trim(), blocked: isBlocked(w.displayName), production: isProduction(w.displayName) }));
   list.sort((a, b) => a.name.localeCompare(b.name));
   return { workspaces: list, suggested: flow ? suggestTarget(flow.data, list) : undefined, repoName: flow?.data.reportName };
 }
@@ -502,6 +504,8 @@ export interface PublishChoice {
   reportId?: string;
   /** Name for the report in Fabric and in the repo. */
   name?: string;
+  /** Matt ticked "publish to production" on the card. */
+  confirmProduction?: boolean;
 }
 
 export async function decideFlowCard(approval: Approval, approve: boolean, note?: string, extra: PublishChoice = {}): Promise<string> {
@@ -593,7 +597,8 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     assertNotActive(story, flow);
     const ws = (await workspaces()).find((w) => w.id === extra.workspaceId);
     if (!ws) throw new Error("That workspace isn't one you can access");
-    if (isBlocked(ws.displayName)) throw new Error(`${ws.displayName.trim()} is a TEST/PROD workspace; agents never publish there`);
+    if (isBlocked(ws.displayName)) throw new Error(`${ws.displayName.trim()} is on the blocked list (powerbi.blockedWorkspacePatterns); agents never publish there`);
+    if (isProduction(ws.displayName) && !extra.confirmProduction) throw new Error(`${ws.displayName.trim()} is a production workspace: tick the production box on the card to publish there`);
     const name = (extra.name ?? flow.data.reportName).trim();
     if (!name || name.length > 200 || /[<>:"/\\|?*]/.test(name)) throw new Error('The report name must be 1–200 characters, without < > : " / \\ | ? *');
     let target: { id: string; name: string } | undefined;
@@ -603,7 +608,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       target = { id: found.id, name: found.displayName };
     }
     await saveFlow(story, 'publishing', flow.data);
-    void pipeline(story, approval.id, () => publishFlow(story, ws, approval.id, { target, name }));
+    void pipeline(story, approval.id, () => publishFlow(story, ws, approval.id, { target, name, production: isProduction(ws.displayName) }));
     return `Publishing to ${ws.displayName.trim()} as "${name}"…`;
   }
 
@@ -621,7 +626,7 @@ async function pipeline(story: string, approvalId: string, step: () => Promise<v
       await saveFlow(story, 'failed', { ...flow.data, activeRunId: undefined, error: message });
       await postAppNote(flow.data.conversationId, `**Stopped:** ${message}\n\nAsk the orchestrator here to retry (a rebuild card) once it's sorted.`);
     }
-    await setOutcome(approvalId, `Failed: ${message.slice(0, 300)}`).catch(() => undefined);
+    if (approvalId) await setOutcome(approvalId, `Failed: ${message.slice(0, 300)}`).catch(() => undefined);
   }
 }
 
@@ -820,7 +825,7 @@ interface Touched {
   model?: string;
 }
 
-async function publishFlow(story: string, ws: Workspace, approvalId: string, choice: { target?: { id: string; name: string }; name: string }) {
+async function publishFlow(story: string, ws: Workspace, approvalId: string, choice: { target?: { id: string; name: string }; name: string; production?: boolean }) {
   const before = (await getFlow(story))!.data;
   const wt = before.worktree!;
   const wsName = ws.displayName.trim();
@@ -830,7 +835,9 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
   const afterQc = qcd ? await changedFiles(wt, qcd.sha) : [];
   // The name on the card becomes the name in the repo too, so git and Fabric match.
   const modelFollows = !!before.modelName && before.modelName === before.reportName;
-  const data = await renameInRepo(story, before, choice.name);
+  let data = await renameInRepo(story, before, choice.name);
+  // The app's own rename commit isn't a change QC needs to see: if QC covered everything before it, it still covers the branch.
+  if (data !== before && qcd && afterQc.length === 0) data = { ...data, finalQc: { ...qcd, sha: await headSha(wt) } };
   if (data !== before) await saveFlow(story, 'publishing', data);
 
   const targetItems = await listItems(ws.id);
@@ -904,7 +911,7 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
   await postAppNote(
     data.conversationId,
     [
-      `**Published** to **${wsName}**: ${[touched.report, touched.model].filter(Boolean).join('; ')}. [Open in Power BI](${reportUrl})`,
+      `**Published** to **${wsName}**${choice.production ? ' (production)' : ''}: ${[touched.report, touched.model].filter(Boolean).join('; ')}. [Open in Power BI](${reportUrl})`,
       data.reportName !== before.reportName && `Renamed in the repo too: \`${before.reportDir}\` → \`${data.reportDir}\`.`,
       afterQc.length > 0 && `**Heads up:** ${afterQc.length} file(s) changed after the final QC (saved in Desktop after it ran), so QC didn't see them: ${afterQc.slice(0, 5).map((f) => `\`${f}\``).join(', ')}${afterQc.length > 5 ? ', …' : ''}.`,
       prUrl ? `**Pull request:** [${prUrl.split('/').pop()}](${prUrl}). Merging it is yours.` : `**PR not opened:** ${prError}`,
@@ -913,8 +920,10 @@ async function publishFlow(story: string, ws: Workspace, approvalId: string, cho
       .filter(Boolean)
       .join('\n\n'),
   );
-  // Last step: how much time to log for the story (a failure here mustn't look like a failed publish).
-  await askTimeEntry(data.conversationId, story).catch((err) => postAppNote(data.conversationId, `Couldn't put up the Timesheet card: ${err instanceof Error ? err.message : err}`));
+  // Last step: how much time to log for the story (a failure here mustn't look like a failed publish). A story already
+  // in close-out (published before) gets its last time card from the Close story card instead.
+  const inCloseout = await queryOne('SELECT 1 AS x FROM dbo.story_checklists WHERE story_number = ?', [story]);
+  if (!inCloseout) await askTimeEntry(data.conversationId, story).catch((err) => postAppNote(data.conversationId, `Couldn't put up the Timesheet card: ${err instanceof Error ? err.message : err}`));
   // From here the rollout is Matt's: his close-out list keeps the story open until it's done.
   await startCloseout(story).catch(() => undefined);
 }
@@ -1023,23 +1032,28 @@ async function finalQc(story: string) {
   const next: FlowData = { ...current.data, finalQc: { ...qc, sha } };
   await saveFlow(story, 'review', next);
   await postAppNote(data.conversationId, `**Final QC: ${qc.verdict}**\n\n${qc.result.slice(0, 6000)}`);
+  await raisePublishCard(story, next, qc, manual.length);
+}
+
+async function raisePublishCard(story: string, d: FlowData, qc: { verdict?: string; result: string; runId?: string }, manualFiles: number) {
   const card = await createApproval({
     kind: 'pbi_publish',
-    title: `${story}: publish "${next.reportName}" and open the PR`,
+    title: `${story}: publish "${d.reportName}"${d.prUrl ? '' : ' and open the PR'}`,
     payload: {
-      conversationId: data.conversationId,
+      conversationId: d.conversationId,
       storyNumber: story,
-      reportName: next.reportName,
-      modelName: next.modelName ?? '',
-      branch: next.branch,
+      reportName: d.reportName,
+      modelName: d.modelName ?? '',
+      branch: d.branch,
       qcVerdict: qc.verdict ?? 'not run',
       qcReport: qc.result.slice(0, 8000),
-      manualFiles: String(manual.length),
+      manualFiles: String(manualFiles),
       qcRunId: qc.runId ?? '',
+      published: d.published ? `${d.published.workspaceName}` : '',
     },
     requestedByRunId: null,
   });
-  await postApprovalCard(data.conversationId, card.id);
+  await postApprovalCard(d.conversationId, card.id);
 }
 
 function finalQcBrief(story: string, d: FlowData, files: string[], stat: string, manual: string[]): string {
@@ -1058,4 +1072,27 @@ function finalQcBrief(story: string, d: FlowData, files: string[], stat: string,
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+/**
+ * "Publish it again" (e.g. Acceptance first, then production): a Publish card for the branch as it is. If anything
+ * changed since the last final QC (or there wasn't one), the final QC runs first, as after a review.
+ */
+export async function requestPublish(p: { parentRunId?: string | null }) {
+  const { storyNumber } = await storyChat(p.parentRunId);
+  const flow = await getFlow(storyNumber);
+  if (!flow?.data.worktree) throw new Error(`${storyNumber} has no report branch in the workflow (propose_report_work or attach_report_work first)`);
+  assertNotActive(storyNumber, flow);
+  const wt = flow.data.worktree;
+  await commitAll(wt, `${storyNumber}: changes saved in Power BI Desktop`);
+  const head = await headSha(wt);
+  const qc = flow.data.finalQc;
+  await supersedeFlowCards(storyNumber);
+  if (qc && qc.sha === head) {
+    await raisePublishCard(storyNumber, flow.data, qc, 0);
+    return { status: 'publish card posted', note: "Nothing changed since the final QC, so the Publish card is up. End your turn." };
+  }
+  await saveFlow(storyNumber, 'final_qc', { ...flow.data, reviewSha: flow.data.reviewSha ?? head });
+  void pipeline(storyNumber, '', () => finalQc(storyNumber));
+  return { status: 'final QC running', note: 'The branch changed since the last final QC (or there was none), so QC runs first; the Publish card follows. End your turn.' };
 }
