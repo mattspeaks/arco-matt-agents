@@ -322,7 +322,7 @@ rebuild card.
 - **Catalog.** The app keeps a read-only catalog of every gold and silver table, view and column in
   `data/catalog/{gold,silver}.tsv`. It's built by one fixed `INFORMATION_SCHEMA` query with Matt's `az` identity, takes
   about 12 s per database, and is rebuilt when more than a day old (before a build loop, or via
-  `POST /api/catalog/refresh`). Agents never get a SQL connection: Matt can write to gold and silver, so the script takes no SQL
+  `POST /api/catalog/refresh`). Agents never get a SQL connection: Matt is db_owner on gold, so the script takes no SQL
   input.
 - **The builder checks everything the work needs.** It compares against the model TMDL and the gold catalog, and ends
   its result with a `data-gaps` JSON block listing every gap at its level:
@@ -396,23 +396,6 @@ rebuild card.
   the declined design and his feedback, marked authoritative. Declining with no comment just leaves a note.
 - Comments on other declined cards (data-gaps story, Pause, Close story, Timesheet) also reach the chat, so a note is
   never silently dropped. If the chat is busy, the comment shows as an app note.
-
-### 5.3f Read-only data checks: `dwh_query` (`dwh/query.ts`, `scripts/dwh_query.py`, `mcp/worker-mcp.mjs`)
-- **Who gets it.** Workers with `dwhQuery: true` in their policy, today the report model builder and the gap
-  designer. They get one MCP tool, `dwh_query`, and never a connection. The workspace SQL address isn't read-only:
-  it's shared by every warehouse, and Matt's identity can INSERT, ALTER and CREATE VIEW on gold and silver. So:
-- **The app checks every query** (`checkQuery`):
-  - one SELECT or WITH statement; no write, DDL, EXEC or session keywords; no `;` chains; no `SELECT *`;
-  - only the catalog databases; `dwh.query.blockedDatabases` (bronze_confidential, gold_uat, arco_meta_dw,
-    staging) are refused, including through three-part names;
-  - columns the ontology flags sensitive (55 today), and `blockedColumnPatterns` (pay and personal data), may
-    appear in a SELECT list only inside COUNT(...). Joins, filters and GROUP BY on them are fine.
-- **The Python runner checks again**, then runs the statement inside a transaction that is always rolled back.
-- **Limits:** 50 rows, values cut at 200 characters, a 60-second timeout, and 40 queries per run.
-- **Logging and tests.** Each call, with its stated purpose and result, shows in the run log. The gate's regression
-  test is `npm run test:query` (add `-- --live` for real read-only queries).
-- **Later:** a reader-only identity (gold and silver reader roles, no workspace role) would make the database itself
-  refuse writes. Swapping the runner to it would be a config change.
 
 ### 5.3e Shared reference copies the data bots read
 - **Gold semantic models** (`dwh/goldModels.ts`): a read-only TMDL copy of every `^Gold ` model in the ARCO DWH

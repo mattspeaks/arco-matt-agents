@@ -85,25 +85,6 @@
     "goldModels": {
       "workspaceId": "7edf4894-85d9-4c6f-a06d-300bbaa66edb",
       "namePattern": "^Gold "
-    },
-    "query": {
-      "maxRows": 50,
-      "timeoutSeconds": 60,
-      "perRunLimit": 40,
-      "blockedDatabases": [
-        "bronze_confidential",
-        "gold_uat",
-        "arco_meta_dw",
-        "StagingLakehouseForDataflows",
-        "StagingWarehouseForDataflows"
-      ],
-      "blockedColumnPatterns": [
-        "\\bssn\\b|social[_ ]?security",
-        "\\bsalar(y|ies)\\b|pay[_ ]?rate|hourly[_ ]?rate|base[_ ]?rate|annual[_ ]?pay|\\bcompensation\\b",
-        "date[_ ]?of[_ ]?birth|birth[_ ]?date|\\bdob\\b",
-        "bank[_ ]?account|routing[_ ]?number|tax[_ ]?id\\b",
-        "home[_ ]?address|personal[_ ]?(email|phone)"
-      ]
     }
   },
   "closeoutChecklist": [
@@ -223,8 +204,7 @@
         "Bash(git add:*)",
         "Bash(git commit:*)",
         "Bash(git -C:*)",
-        "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)",
-        "mcp__arcoworker__dwh_query"
+        "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)"
       ],
       "disallowedTools": [
         "Bash(git push:*)",
@@ -236,8 +216,7 @@
         "WebSearch",
         "Task",
         "Agent"
-      ],
-      "dwhQuery": true
+      ]
     },
     "dwh-gap-designer": {
       "domain": "dwh",
@@ -247,8 +226,7 @@
         "Read",
         "Grep",
         "Glob",
-        "Skill",
-        "mcp__arcoworker__dwh_query"
+        "Skill"
       ],
       "disallowedTools": [
         "Edit",
@@ -259,8 +237,7 @@
         "WebSearch",
         "Task",
         "Agent"
-      ],
-      "dwhQuery": true
+      ]
     }
   }
 }

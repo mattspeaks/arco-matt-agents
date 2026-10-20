@@ -10,8 +10,7 @@
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
     "db:init": "npm run db:init -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
-    "test:guard": "node server/hooks/test-sn-write-guard.mjs",
-    "test:query": "npx tsx server/scripts/test-dwh-query.ts"
+    "test:guard": "node server/hooks/test-sn-write-guard.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -16,7 +16,6 @@ import { catalogStatus, ensureCatalog } from './dwh/catalog.js';
 import { ensureOntology, ontologyStatus } from './dwh/ontology.js';
 import { ensureGoldModels, goldModelsStatus } from './dwh/goldModels.js';
 import { startGapDesign } from './pbi/gapdesign.js';
-import { formatResult, runQuery } from './dwh/query.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
@@ -300,14 +299,6 @@ app.post<{ Body: AgentBody }>('/api/agent/start_closeout', async (req) => {
   if (!conv?.story_number) throw bad('start_closeout only works in a story chat');
   return agentCall(() => getChecklist(conv.story_number!).then((c) => c ?? startCloseout(conv.story_number!)));
 });
-// A data worker's read-only query (worker-mcp.mjs → dwh/query.ts). Only a running worker whose policy allows it.
-app.post<{ Body: { runId?: string; database?: string; sql?: string; purpose?: string } }>('/api/worker/dwh_query', async (req) => {
-  const run = req.body.runId ? await getRun(req.body.runId) : undefined;
-  if (!run?.worker || run.status !== 'running' || !config.workers[run.worker]?.dwhQuery) throw bad('dwh_query is only for a running data worker');
-  if (!req.body.database || !req.body.sql) throw bad('database and sql are required');
-  return formatResult(await runQuery(run.id, req.body.database, req.body.sql));
-});
-
 app.post<{ Body: AgentBody }>('/api/agent/start_gap_design', async (req) =>
   agentCall(() => startGapDesign({ parentRunId: req.body.parentRunId, originStory: str(req.body.origin_story), notes: str(req.body.notes) })),
 );

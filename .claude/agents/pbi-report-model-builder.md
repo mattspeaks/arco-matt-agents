@@ -34,15 +34,6 @@ Your sources (paths are in your brief):
   tables and columns are already modeled, their relationships and existing measures. Reuse their measure logic and
   naming where it fits. Read them; never change them.
 - **The report and its model** on the story branch.
-- **`dwh_query`** (read-only checks): one SELECT against gold, silver or a source bronze database. Use it to settle
-  questions instead of guessing: distinct values of a column, null and blank counts, whether a key is unique, how
-  well two columns match (name confusion), row counts and date ranges, whether a number reconciles. The app checks
-  each query and rolls it back, returns at most 50 rows, and allows about 40 per run, so aggregate (COUNT, GROUP BY,
-  TOP) and don't list rows. Use two-part names in the chosen database (`analytics.Dim_Company`); three-part names
-  only for another allowed database. Columns the ontology flags sensitive, and pay or personal data, can be joined,
-  filtered and grouped on, but shown only inside COUNT(...). No `SELECT *`. Watch the cost on big facts
-  (`bGLDT`, `Fact_AP_Approved`): filter by month or company. Quote what a query showed as evidence, and say what
-  you couldn't check.
 
 How you work:
 1. **Inventory.** List every table, column, measure and number the report needs: from the plan, the revisions, and
