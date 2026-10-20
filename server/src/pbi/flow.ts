@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, posix, relative, resolve } from 'node:path';
-import { config } from '../config.js';
+import { config, REPO_ROOT } from '../config.js';
 import { query, queryOne } from '../db/index.js';
 import { createApproval, getApproval, setOutcome, supersedeChatApprovals, type Approval } from '../approvals.js';
 import { cancelClaudeRun } from '../claude/runner.js';
@@ -15,6 +15,7 @@ import { startCloseout } from '../closeout.js';
 import { lintBranch, lintSummary, type LintDiff } from './lint.js';
 import { catalogPath, ensureCatalog } from '../dwh/catalog.js';
 import { ensureOntology } from '../dwh/ontology.js';
+import { ensureGoldModels, goldModelsLine } from '../dwh/goldModels.js';
 import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
 import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
@@ -655,6 +656,18 @@ export interface PublishChoice {
   confirmProduction?: boolean;
 }
 
+/**
+ * Matt's comment on a card he declined, sent into the chat as his message so the orchestrator acts on it. If the chat
+ * is busy, it's shown as a note instead (the decision itself still stands).
+ */
+export async function forwardNote(conversationId: string, title: string, note: string) {
+  try {
+    await sendMessage(conversationId, `About the card I just declined (${title}): ${note}`);
+  } catch {
+    await postAppNote(conversationId, `**Your comment on "${title}"** (the chat was busy, so the orchestrator hasn't seen it; send it again when it's free):\n\n> ${note}`);
+  }
+}
+
 export async function decideFlowCard(approval: Approval, approve: boolean, note?: string, extra: PublishChoice = {}): Promise<string> {
   const p = JSON.parse(approval.payload) as CardPayload;
   const story = p.storyNumber;
@@ -749,6 +762,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       if (p.blocked) await raiseProceedCard(story, flow.data);
     };
     if (!approve) {
+      if (note) await forwardNote(p.conversationId, approval.title, note);
       await next();
       return 'No story';
     }
@@ -799,6 +813,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     }
     await saveFlow(story, 'idle', { ...flow.data, pausedForGaps: true, proceedDespiteGaps: false, gapDecision: undefined });
     await postAppNote(p.conversationId, `Paused until the data gaps are resolved. When they are, ask the orchestrator here to rebuild; it'll check the data again first.`);
+    if (note) await forwardNote(p.conversationId, approval.title, note);
     return 'Paused for data gaps';
   }
 
@@ -1476,6 +1491,7 @@ function modelBrief(
   ontology: { path: string; asOf: string | null; entities: number; error?: string },
   findings?: string,
   requests: ModelRequest[] = [],
+  gold?: Awaited<ReturnType<typeof ensureGoldModels>>,
 ): string {
   const wt = d.worktree!;
   const decision = d.gapDecision;
@@ -1501,6 +1517,8 @@ function modelBrief(
         : `- This report has no model of its own in the repo (${d.thinReportNote ?? 'thin report'}). Don't create one unless the plan asks; report what's needed instead.`,
       `- Ontology (ARCO_Gold_Ontology, ${ontology.entities} entities${ontology.asOf ? `, as of ${ontology.asOf.slice(0, 10)}` : ''}): ${ontology.asOf ? ontology.path : `not available (${ontology.error ?? 'unknown'}): rely on the catalogs and say so`}`,
       `- Catalogs: ${catalog.filter((c) => c.asOf).map((c) => `\`${c.path}\``).join(', ') || 'none available'}`,
+      gold && goldModelsLine(gold),
+      `- ARCO data facts Matt confirmed (read first; they override your own findings): ${join(REPO_ROOT, 'memory', 'arco-data-lessons.md')}`,
       `- House linter (also parses the TMDL with Desktop's parser): \`py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py "${join(wt, d.reportDir!)}"\``,
       `- Commit with \`git -C "${wt}" commit\` and a message starting with ${story}. Don't push.`,
     ].join('\n'),
@@ -1534,7 +1552,7 @@ async function modelStep(story: string, requests: ModelRequest[] = []): Promise<
   const d0 = start.data;
   const wt = d0.worktree!;
   await saveFlow(story, 'modeling', d0);
-  const [catalog, ontology] = await Promise.all([ensureCatalog(), ensureOntology()]);
+  const [catalog, ontology, gold] = await Promise.all([ensureCatalog(), ensureOntology(), ensureGoldModels()]);
   const before = await headSha(wt);
   const label = d0.round > 1 ? ` (round ${d0.round})` : '';
 
@@ -1542,7 +1560,7 @@ async function modelStep(story: string, requests: ModelRequest[] = []): Promise<
   let findings: string | undefined;
   for (let pass = 1; pass <= 2; pass++) {
     await postAppNote(d0.conversationId, `Report model builder${pass > 1 ? ' (fixing model QC findings)' : ''}${label} started.`);
-    const m = await runWorker('pbi-report-model-builder', modelBrief(story, d0, pass, catalog, ontology, findings, requests), story, wt, 'modeling');
+    const m = await runWorker('pbi-report-model-builder', modelBrief(story, d0, pass, catalog, ontology, findings, requests, gold), story, wt, 'modeling');
     if (!m) return false;
     if (m.status !== 'succeeded') throw new Error(`Report model builder ${m.status}${m.error ? `: ${m.error}` : ''}`);
     result = m.result ?? '';

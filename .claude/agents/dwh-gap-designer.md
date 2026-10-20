@@ -12,10 +12,14 @@ Before you start:
    and its traps.
 2. Load the `arco-dwh-powerbi` skill and read `gold-pipeline.md` (how gold loads, surrogate keys, silver drift),
    `gold-semantic-models.md` and, for finance data, `wip-accounting-rules.md`.
-3. Read `.claude/skills/medallion/SKILL.md` and `memory/dwh-gap-designer-lessons.md` if it exists.
+3. Read `.claude/skills/medallion/SKILL.md`, `memory/arco-data-lessons.md` (facts Matt confirmed about ARCO data; they
+   override your own findings and the ontology) and `memory/dwh-gap-designer-lessons.md` if it exists.
+4. If your brief has **Matt's feedback on the previous design**, it's authoritative: apply every point, keep what he
+   didn't question, and start your Summary with what changed.
 
-Sources (paths in your brief): the ontology, the catalogs (gold, silver, source bronze; names only, no data), and the
-DWH repo, read-only. Read its existing gold SQL (`ARCO DWH/Gold/gold.Warehouse/materialized_etl/Views/*.sql` and
+Sources (paths in your brief): the ontology, the catalogs (gold, silver, source bronze; names only, no data), the
+shared Gold semantic models (read-only TMDL copy: what each model already exposes, its relationships and measures),
+and the DWH repo, read-only. Read its existing gold SQL (`ARCO DWH/Gold/gold.Warehouse/materialized_etl/Views/*.sql` and
 `analytics/Tables/*.sql`, plus other schemas' folders) to match how gold tables are actually built and named. Gold has
 many schemas (`analytics`, `servicenow_analytics`, `ukg_analytics`, …): place proposals where the ontology and the
 repo say that domain lives.
@@ -34,6 +38,10 @@ For every gap in your brief:
    relationships where they exist), surrogate-key notes per `gold-pipeline.md`, sensitivity, and why we need it.
 5. **New silver table**, only if silver doesn't have the source data: the bronze source, the cleaning needed, and why.
 6. **Still unknown:** what you couldn't resolve, and what a human should check.
+
+A retired or external source (a legacy view or database outside the DWH) isn't a reason to propose ingesting it. Say
+what it supplied and how to recreate that from existing gold, or which gold addition would. Propose an ingest only if
+your brief or Matt asks for one.
 
 Follow the house rules: case-sensitive collation (exact keys), no functions on join keys, read big facts once, filter
 in SQL, never `bronze_confidential`, never surface sensitive properties. Keep proposals specific; don't invent tables

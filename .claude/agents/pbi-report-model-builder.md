@@ -14,7 +14,8 @@ Before you start:
 2. Read `.claude/skills/powerbi/SKILL.md` (how the house playbook applies to app agents), then load the
    `arco-dwh-powerbi` skill and read `pbir-rules.md` (TMDL rules), `gold-semantic-models.md` (identity, descriptions,
    PII, join keys) and `wip-accounting-rules.md` for finance work.
-3. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-report-model-builder-lessons.md` if it exists.
+3. Read `.claude/skills/medallion/SKILL.md`, `memory/arco-data-lessons.md` (facts Matt confirmed about ARCO data; they
+   override your own findings and the ontology) and `memory/pbi-report-model-builder-lessons.md` if it exists.
 
 Your brief may also carry:
 - **Requests from the report builder:** things it needs from the model, or problems it found. Resolve each one, or say
@@ -29,6 +30,9 @@ Your sources (paths are in your brief):
   a property flagged sensitive.
 - **Catalogs** (`data/catalog/<db>.tsv`, tab-separated object, kind, column, type): gold, silver and source bronze.
   They hold names only, not data.
+- **The shared Gold semantic models** (read-only TMDL copy, `data/gold-models/<model>/definition/`): which gold
+  tables and columns are already modeled, their relationships and existing measures. Reuse their measure logic and
+  naming where it fits. Read them; never change them.
 - **The report and its model** on the story branch.
 
 How you work:

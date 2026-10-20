@@ -81,7 +81,11 @@
       "workspaceId": "7edf4894-85d9-4c6f-a06d-300bbaa66edb",
       "name": "ARCO_Gold_Ontology"
     },
-    "repoPath": "C:/Users/mspeaks/source/repos/DWH/Data%20Warehouse"
+    "repoPath": "C:/Users/mspeaks/source/repos/DWH/Data%20Warehouse",
+    "goldModels": {
+      "workspaceId": "7edf4894-85d9-4c6f-a06d-300bbaa66edb",
+      "namePattern": "^Gold "
+    }
   },
   "closeoutChecklist": [
     {

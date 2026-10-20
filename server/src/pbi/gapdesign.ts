@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { config } from '../config.js';
+import { config, REPO_ROOT } from '../config.js';
 import { query, queryOne } from '../db/index.js';
 import { createApproval, type Approval } from '../approvals.js';
 import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
@@ -8,6 +8,7 @@ import { createRun, getRun } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { ensureCatalog } from '../dwh/catalog.js';
 import { ensureOntology } from '../dwh/ontology.js';
+import { ensureGoldModels, goldModelsLine } from '../dwh/goldModels.js';
 import { getFlow, gapsMarkdown, sourcesMarkdown, type FlowData, type GapMapping } from './flow.js';
 
 // Working a "Data Gaps for - STRY…" story: dwh-gap-designer (read-only) separates name confusion from real gaps and
@@ -50,7 +51,13 @@ export async function startGapDesign(p: { parentRunId?: string | null; originSto
   const origin = await originOf(gapsStory, p.originStory);
   const originFlow = origin ? await getFlow(origin) : undefined;
   const gaps = (originFlow?.data.gaps ?? []).filter((g) => g.kind !== 'derivable');
-  const [catalog, ontology] = await Promise.all([ensureCatalog(), ensureOntology()]);
+  const [catalog, ontology, gold] = await Promise.all([ensureCatalog(), ensureOntology(), ensureGoldModels()]);
+  // Matt's latest declined design for this story, with his feedback: the rerun applies it.
+  const previous = await queryOne<{ payload: string; decision_note: string | null }>(
+    `SELECT TOP 1 payload, decision_note FROM dbo.approvals WHERE kind = 'gap_design' AND status = 'rejected' AND decision_note IS NOT NULL
+       AND JSON_VALUE(payload, '$.storyNumber') = ? ORDER BY decided_at DESC`,
+    [gapsStory],
+  );
   const repo = existsSync(DWH_REPO()) ? DWH_REPO() : undefined;
 
   const brief = [
@@ -58,11 +65,15 @@ export async function startGapDesign(p: { parentRunId?: string | null; originSto
     gaps.length
       ? `## The gaps (from the report model builder on ${origin})\n${gapsMarkdown(gaps)}\n\n${sourcesMarkdown(gaps)}`
       : `## The gaps\nNot found in the app (the original report story is ${origin ?? 'unknown'}). Read them from the ServiceNow story's description: it's in the app's story copy, or ask in your result.`,
+    previous?.decision_note &&
+      `## Matt's feedback on the previous design (authoritative: apply every point)\n${previous.decision_note}\n\n### The previous design he declined\n${(JSON.parse(previous.payload) as { preview?: string }).preview?.slice(0, 9000) ?? '(not kept)'}`,
     p.notes && `## Notes from Matt / the orchestrator\n${p.notes}`,
     [
       '## Where',
       `- Ontology: ${ontology.asOf ? `${ontology.path} (${ontology.entities} entities, as of ${ontology.asOf.slice(0, 10)})` : `not available (${ontology.error ?? 'unknown'})`}`,
       `- Catalogs (tab-separated object, kind, column, type): ${catalog.filter((c) => c.asOf).map((c) => c.path).join(', ')}`,
+      goldModelsLine(gold),
+      `- ARCO data facts Matt confirmed (read first; they override your own findings): ${resolve(REPO_ROOT, 'memory', 'arco-data-lessons.md')}`,
       repo ? `- DWH repo (read-only, for how gold is built): ${repo}` : '- DWH repo: not found locally; rely on the catalogs and say so',
     ].join('\n'),
   ]
@@ -108,8 +119,28 @@ export async function startGapDesign(p: { parentRunId?: string | null; originSto
 
 /** Matt's decision on a gap design. Approve: work note on the gaps story; the name mappings go to the original story. */
 export async function decideGapDesign(approval: Approval, approve: boolean, note?: string): Promise<string> {
-  if (!approve) return 'Not approved';
   const p = JSON.parse(approval.payload) as { conversationId: string; storyNumber: string; originStory: string; mappings: string };
+  if (!approve) {
+    if (!note?.trim()) {
+      await postAppNote(p.conversationId, 'Gap design not approved. Tell the orchestrator here what to change, or decline it with a comment, and it reruns the designer with your feedback.');
+      return 'Not approved';
+    }
+    // Answer first: if the chat is busy this throws and the card stays pending, so the feedback isn't lost.
+    await sendMessage(
+      p.conversationId,
+      [
+        `I'm not approving the gap design for ${p.storyNumber} yet. My feedback:`,
+        '',
+        note.trim(),
+        '',
+        '1. Answer any question I asked above.',
+        '2. For each fact I stated about our data (what something really is, a source we will never use, what a column means), propose a lesson with propose_lesson, worker "arco-data", one per fact, so every data bot remembers it.',
+        '3. Then call start_gap_design again. The app gives the designer the previous design and this feedback.',
+      ].join('\n'),
+      { answersApprovalId: approval.id },
+    );
+    return 'Not approved: feedback sent; the designer reruns with it';
+  }
   const mappings = JSON.parse(p.mappings || '[]') as GapMapping[];
   await sendMessage(
     p.conversationId,

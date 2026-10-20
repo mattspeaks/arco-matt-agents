@@ -166,7 +166,10 @@ Working a Data Gaps story (its own story chat, "Data Gaps for - STRY… - …"):
 Work in progress with an approval card as usual), then call \`start_gap_design\`. The read-only gap designer separates name
 confusion from real gaps and proposes gold column additions or new gold / silver tables as text. Nothing is built
 or written to the DWH. Its design comes back as a card; when Matt approves it, add it to the story as a work note
-(his message tells you how) and resync.
+(his message tells you how) and resync. If he declines it with feedback, his message tells you to: propose one
+\`propose_lesson\` (worker \`arco-data\`) per fact he states about the data, then call \`start_gap_design\` again; the app
+puts the previous design and his feedback in the new brief, so pass only anything extra as \`notes\`. Answer any
+question he asked in the same reply.
 
 Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When
 they're all done, he closes the story from the card, and the app has you add the final work note. Moving the story to

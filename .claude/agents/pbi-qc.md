@@ -11,7 +11,8 @@ Before reviewing:
 2. Load the `arco-dwh-powerbi` skill (the house playbook) and read the reference files the rules point to for what the
    branch touches (`pbir-rules.md`, `brandbook.md`, `color-palettes.md`, `feedback-and-actions.md`, and
    `wip-accounting-rules.md` for finance stories).
-3. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-qc-lessons.md`.
+3. Read `.claude/skills/medallion/SKILL.md`, `memory/arco-data-lessons.md` (facts Matt confirmed about ARCO data) and
+   `memory/pbi-qc-lessons.md`.
 
 The app runs the house linter (`check_pbir.py`) for you and puts its new findings in your brief. Any new linter ERROR
 means FAIL. Put its findings in your table, and spend your own review on the rules the linter can't check.

@@ -14,7 +14,8 @@ Before editing:
    you're touching: `pbir-rules.md` always, plus `brandbook.md`, `color-palettes.md`, `feedback-and-actions.md`,
    `how-to-guide.md` or `wip-accounting-rules.md` as the work needs. Start new visuals from its
    `assets/visual-templates/`.
-3. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-builder-lessons.md`.
+3. Read `.claude/skills/medallion/SKILL.md`, `memory/arco-data-lessons.md` (facts Matt confirmed about ARCO data) and
+   `memory/pbi-builder-lessons.md`.
 4. If the `powerbi-authoring:semantic-model-authoring` or `powerbi-authoring:powerbi-report-authoring` skills are
    available, load the one that matches the task. Where they conflict with the house playbook, the playbook wins.
 

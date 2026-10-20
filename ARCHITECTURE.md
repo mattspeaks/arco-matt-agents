@@ -391,6 +391,18 @@ rebuild card.
 - **The design comes back as a card** in the gaps story chat. **Approve design** starts the turn that adds it to the
   story as a work note, and sends the approved **name mappings** to the original report's story. There they're stored
   on its flow (`approvedMappings`) and given to the report model builder on the next rebuild.
+- **Declining with a comment** sends the comment into the chat as Matt's message. The orchestrator answers his
+  questions, proposes one `arco-data` lesson per fact he stated, and reruns the designer. The rerun's brief carries
+  the declined design and his feedback, marked authoritative. Declining with no comment just leaves a note.
+- Comments on other declined cards (data-gaps story, Pause, Close story, Timesheet) also reach the chat, so a note is
+  never silently dropped. If the chat is busy, the comment shows as an app note.
+
+### 5.3e Shared reference copies the data bots read
+- **Gold semantic models** (`dwh/goldModels.ts`): a read-only TMDL copy of every `^Gold ` model in the ARCO DWH
+  workspace, in `data/gold-models/<model>/`, fetched with getDefinition and refreshed daily. It shows what each model
+  already exposes. `npx tsx server/scripts/fetch-gold-models.ts` refreshes it now.
+- **ARCO data facts** (`memory/arco-data-lessons.md`): lessons Matt approved with worker `arco-data`, such as name
+  mappings and retired sources. Every data bot reads the file first, and it overrides their findings and the ontology.
 
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:

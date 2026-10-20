@@ -14,6 +14,7 @@ import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
 import { catalogStatus, ensureCatalog } from './dwh/catalog.js';
 import { ensureOntology, ontologyStatus } from './dwh/ontology.js';
+import { ensureGoldModels, goldModelsStatus } from './dwh/goldModels.js';
 import { startGapDesign } from './pbi/gapdesign.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
@@ -149,6 +150,8 @@ app.post('/api/catalog/refresh', async () => ensureCatalog(true));
 // The read-only ARCO_Gold_Ontology copy the report model builder reads (dwh/ontology.ts).
 app.get('/api/ontology', async () => ontologyStatus());
 app.post('/api/ontology/refresh', async () => ensureOntology(true));
+app.get('/api/gold-models', async () => goldModelsStatus());
+app.post('/api/gold-models/refresh', async () => ensureGoldModels(true));
 
 // ---- Agent API (called only by the arco MCP server the orchestrator runs) ---------------------
 type AgentBody = Record<string, unknown> & { parentRunId?: string | null };

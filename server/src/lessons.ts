@@ -43,7 +43,7 @@ export async function approveLesson(lessonId: string): Promise<string> {
   if (!lesson) return 'Lesson not found';
   const file = resolve(REPO_ROOT, 'memory', `${lesson.worker}-lessons.md`);
   if (!existsSync(file)) writeFileSync(file, `# ${lesson.worker} lessons\n`, 'utf8');
-  const prefix = lesson.worker.startsWith('dwh') ? 'DWH' : 'PBI';
+  const prefix = lesson.worker === 'arco-data' ? 'DATA' : lesson.worker.startsWith('dwh') ? 'DWH' : 'PBI';
   const count = (readFileSync(file, 'utf8').match(/^### L-/gm) ?? []).length;
   const code = `L-${prefix}-${String(count + 1).padStart(3, '0')}`;
   const today = new Date().toISOString().slice(0, 10);

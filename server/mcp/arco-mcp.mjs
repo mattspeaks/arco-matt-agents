@@ -100,7 +100,7 @@ server.registerTool(
 server.registerTool(
   'propose_lesson',
   {
-    description: "Draft a lesson from Matt's feedback for a worker's lessons file. Matt approves it in the UI before it's saved.",
+    description: "Draft a lesson from Matt's feedback for a worker's lessons file. Matt approves it in the UI before it's saved. Use worker 'arco-data' for facts about ARCO data itself (X is really column Y, a source is retired / never to be ingested, what a column means): every data bot reads that file. One lesson per fact.",
     inputSchema: {
       worker: z.string(),
       rule: z.string(),

@@ -45,6 +45,8 @@ export interface AppConfig {
     repoPath: string;
     /** The Fabric IQ ontology the report model builder reads (dwh/ontology.ts). */
     ontology: { workspaceId: string; name: string };
+    /** The shared Gold semantic models copied read-only for the model builder and gap designer (dwh/goldModels.ts). */
+    goldModels: { workspaceId: string; namePattern: string };
   };
   /** Matt's default close-out list for a story; auto: 'pr' items tick themselves when the story's PR completes. */
   closeoutChecklist: { label: string; auto?: 'pr' }[];

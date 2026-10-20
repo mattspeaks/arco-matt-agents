@@ -60,6 +60,13 @@ export async function listApprovals(status?: string): Promise<Approval[]> {
 }
 
 /** A newer preview in the same chat replaces older pending cards, so only the latest can be approved. */
+async function forwardDeclined(approval: Approval, note: string) {
+  const { conversationId } = JSON.parse(approval.payload) as { conversationId?: string };
+  if (!conversationId) return;
+  const { forwardNote } = await import('./pbi/flow.js');
+  await forwardNote(conversationId, approval.title, note);
+}
+
 export async function supersedeChatApprovals(conversationId: string, exceptId?: string) {
   const rows = await query<Approval>(
     `SELECT * FROM dbo.approvals WHERE kind IN ('sn_confirm', 'pbi_start', 'pbi_revise') AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ?`,
@@ -100,6 +107,7 @@ export async function decide(
   if (approval.kind === 'story_close') {
     const { decideClose } = await import('./closeout.js');
     const outcome = await decideClose(approval, approve);
+    if (!approve && note) await forwardDeclined(approval, note);
     await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [approve ? 'approved' : 'rejected', note, outcome, id]);
     const updated = (await getApproval(id))!;
     publish('approval', updated);
@@ -109,6 +117,7 @@ export async function decide(
   if (approval.kind === 'time_entry') {
     const { decideTimeEntry } = await import('./timesheet.js');
     const outcome = await decideTimeEntry(approval, approve, extra.hours, extra.weekStart);
+    if (!approve && note) await forwardDeclined(approval, note);
     await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [approve ? 'approved' : 'rejected', note, outcome, id]);
     const updated = (await getApproval(id))!;
     publish('approval', updated);
