@@ -15,6 +15,8 @@ export interface WorkerConfig {
   allowedTools: string[];
   disallowedTools?: string[];
   model?: string;
+  /** Gets the read-only dwh_query tool (dwh/query.ts, mcp/worker-mcp.mjs). */
+  dwhQuery?: boolean;
 }
 
 export interface AppConfig {
@@ -47,6 +49,8 @@ export interface AppConfig {
     ontology: { workspaceId: string; name: string };
     /** The shared Gold semantic models copied read-only for the model builder and gap designer (dwh/goldModels.ts). */
     goldModels: { workspaceId: string; namePattern: string };
+    /** The data bots' read-only query tool (dwh/query.ts). */
+    query: { maxRows: number; timeoutSeconds: number; perRunLimit: number; blockedDatabases: string[]; blockedColumnPatterns: string[] };
   };
   /** Matt's default close-out list for a story; auto: 'pr' items tick themselves when the story's PR completes. */
   closeoutChecklist: { label: string; auto?: 'pr' }[];

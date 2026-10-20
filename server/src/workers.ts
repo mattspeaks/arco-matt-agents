@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { config, REPO_ROOT } from './config.js';
+import { API_BASE, config, REPO_ROOT } from './config.js';
 import { finishRun, runClaude } from './claude/runner.js';
 import { createApproval } from './approvals.js';
 import { createRun, getRun, parseMeta, updateRun } from './runs.js';
@@ -157,7 +157,12 @@ export async function startWorkerRun(runId: string): Promise<void> {
     disallowedTools: policy.disallowedTools,
     permissionMode: policy.readOnly ? 'default' : 'acceptEdits',
     strictMcp: true,
-    mcpConfig: { mcpServers: {} },
+    // Data workers get one tool, dwh_query: the app checks each SELECT and runs it read-only (dwh/query.ts).
+    mcpConfig: {
+      mcpServers: policy.dwhQuery
+        ? { arcoworker: { type: 'stdio', command: process.execPath, args: [resolve(REPO_ROOT, 'server/mcp/worker-mcp.mjs')], env: { ARCO_API: API_BASE, ARCO_RUN_ID: runId } } }
+        : {},
+    },
     env: { CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: '1' },
   });
 

@@ -10,6 +10,12 @@ match rates, numbered **TRAPS**, and **sensitivity** flags. Domains: Vista finan
 budgets), Textura sub pay apps, Procore safety, UKG payroll and time off, Concur expenses, iCIMS / Greenhouse
 recruiting, CounselLink legal, ServiceNow IT.
 
+## Checking against the data
+The data bots that have the `dwh_query` tool (the report model builder, the gap designer) can run read-only
+SELECTs to confirm what the ontology says, or to settle what it doesn't: values, fill rates, key uniqueness, join
+match rates. Its descriptions already carry many stats (row counts, blanks, match rates); query only for what's
+missing or might be stale. Sensitive properties stay inside COUNT(...).
+
 ## Where it is
 `data/ontology/` in the arco-matt-agents repo: a read-only copy the app fetches from Fabric (getDefinition) and
 refreshes daily. Never edit it. The live item is in the ARCO DWH workspace and agents don't change it.

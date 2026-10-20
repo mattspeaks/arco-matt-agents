@@ -20,6 +20,8 @@ Project rules for every Claude session in this repo: the orchestrator, workers, 
   (`annotation ARCO_TemporarySource`) to repoint to gold once the data-gaps story is done. Never `bronze_confidential`.
 - `pbi-report-model-builder` works only on the one report's own semantic model. Never shared Gold models, the
   ontology, or the DWH.
+- Data bots query the DWH only through the app's `dwh_query` tool (`server/src/dwh/query.ts`): one checked,
+  rolled-back SELECT at a time, never a connection of their own. After changing the gate, run `npm run test:query`.
 - No secrets in the repo. Auth is Windows (SQL Server) and the user's Claude Code login.
 
 ## Developing the app
