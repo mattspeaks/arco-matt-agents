@@ -345,6 +345,28 @@ rebuild card.
      Review as usual. **Pause** leaves the flow idle; the next rebuild checks the data again.
 - **Non-blocking gaps don't stop the build.** The Data gaps card still offers the story, ahead of the Review card.
 
+### 5.3c Report model builder (`.claude/agents/pbi-report-model-builder.md`, `modelStep` in flow.ts)
+- **Model first.** Every round starts with `pbi-report-model-builder`, scoped to the one report's own semantic model.
+  It never touches shared Gold models, the ontology or the DWH. It reads:
+  - **ARCO_Gold_Ontology**, a read-only copy in `data/ontology/` refreshed daily via `getDefinition`: 95 entities
+    mapped to gold tables, declared relationships, and descriptions with grain, join quality, TRAPS and sensitivity;
+  - the **catalogs** (gold, silver and source bronze; `bronze_confidential` is excluded);
+  - the report and its model.
+- **How it resolves what the report needs.** It takes an inventory, maps name confusion, derives what it can (DAX,
+  calculated columns, declared joins), and adds gold tables or columns to the model. What's left are real gaps
+  (`missing_table` / `missing_column`), each with **proposed sources**: silver first, then source bronze, with the
+  join and why.
+- **Model QC when the model changed.** pbi-qc checks it against QC-17 (ontology joins, grain, traps, sensitivity)
+  plus the model rules, with one fix pass.
+- **Blocking gaps stop the round.** The Data gaps card (one story) comes first, then the **Proceed-or-pause** card:
+  - **Pause.**
+  - **Proceed with these sources:** exactly the proposed sources are wired in, each table annotated
+    `ARCO_TemporarySource` with the approval date and the story. QC-01 passes those with a note; any other silver or
+    bronze source still fails.
+  - **Proceed without:** what's left out is listed, not faked.
+- **Handoff.** The model builder's `## Model handoff` goes into the report builder's brief, and the report builder
+  doesn't change the model's tables, sources or relationships.
+
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:
 - **Close-out card.** After a publish, the story chat gets Matt's checklist. The default is in

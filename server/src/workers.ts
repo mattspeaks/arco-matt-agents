@@ -88,7 +88,7 @@ export async function requestWorker(p: {
   // Power BI builds on the PowerBI repo run only inside the report workflow, so every build ends in a Review card and
   // never touches Matt's own checkout.
   const inside = (root: string) => !!projectPath && !relative(resolve(root), projectPath).startsWith('..');
-  if (p.worker === 'pbi-builder' && (inside(config.powerbi.repoPath) || inside(config.powerbi.worktreeRoot))) {
+  if ((p.worker === 'pbi-builder' || p.worker === 'pbi-report-model-builder') && (inside(config.powerbi.repoPath) || inside(config.powerbi.worktreeRoot))) {
     throw new Error(
       'pbi-builder on the PowerBI repo runs only through the report workflow, so the Review and Publish cards follow. Use propose_report_work (from Fabric, or repo_report to build on main), attach_report_work (take over an existing branch), submit_revision (rebuild) or request_review.',
     );

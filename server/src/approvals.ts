@@ -82,7 +82,7 @@ export async function decide(
   id: string,
   approve: boolean,
   note?: string,
-  extra: { workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean; sprint?: 'current' | 'backlog' } = {},
+  extra: { workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean; sprint?: 'current' | 'backlog'; choice?: 'sources' | 'without' } = {},
 ): Promise<Approval> {
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');

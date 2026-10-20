@@ -351,3 +351,4 @@ pre.note {
 @keyframes score-float { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
 @media (max-width: 1100px) { .score-sprint, .score-bar { display: none; } }
 @media (max-width: 760px) { .scoreboard { display: none; } }
+.approval-actions.wrap { flex-wrap: wrap; }

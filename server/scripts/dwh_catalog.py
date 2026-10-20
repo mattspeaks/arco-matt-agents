@@ -1,16 +1,17 @@
 """Read-only catalog of an ARCO Fabric DWH database: every table / view and its columns, as TSV.
 
 Usage:  py dwh_catalog.py --db gold --out data/catalog/gold.tsv
+        py dwh_catalog.py --list-databases
 
 Runs ONE fixed metadata query (INFORMATION_SCHEMA); it takes no SQL input, so it can't change anything, even though the
 signed-in identity may have write rights. Auth: the user's `az login` token for https://database.windows.net (the same
 pattern as the arco-dwh-powerbi skill's fabric_query.py). Output columns: object (db.schema.table), kind (TABLE/VIEW),
 column, data type.
 """
-import argparse, os, shutil, struct, subprocess, sys
+import argparse, os, re, shutil, struct, subprocess, sys
 
 SERVER = "jpea7wyaqnne3hiyaakbzbit4i-sren67wzqvxuzidngaf3vjto3m.datawarehouse.fabric.microsoft.com"
-DATABASES = {"gold", "silver", "gold_uat"}
+DB_NAME = re.compile(r"^[A-Za-z0-9_]{1,128}$")  # a database name, never SQL
 QUERY = """
 SELECT c.TABLE_SCHEMA, c.TABLE_NAME, t.TABLE_TYPE, c.COLUMN_NAME, c.DATA_TYPE
 FROM INFORMATION_SCHEMA.COLUMNS c
@@ -34,13 +35,24 @@ def token():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", required=True, choices=sorted(DATABASES))
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--db")
+    ap.add_argument("--out")
+    ap.add_argument("--list-databases", action="store_true")
     a = ap.parse_args()
     import pyodbc
     tb = token().encode("utf-16-le")
-    cs = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER};DATABASE={a.db};Encrypt=yes;TrustServerCertificate=no"
-    conn = pyodbc.connect(cs, attrs_before={1256: struct.pack(f"<I{len(tb)}s", len(tb), tb)}, timeout=30)
+    def connect(db):
+        cs = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SERVER};DATABASE={db};Encrypt=yes;TrustServerCertificate=no"
+        return pyodbc.connect(cs, attrs_before={1256: struct.pack(f"<I{len(tb)}s", len(tb), tb)}, timeout=30)
+    if a.list_databases:
+        conn = connect("gold")
+        for (n,) in conn.cursor().execute("SELECT name FROM sys.databases ORDER BY name").fetchall():
+            print(n)
+        conn.close()
+        return
+    if not a.db or not a.out or not DB_NAME.match(a.db):
+        ap.error("--db <database name> and --out are required")
+    conn = connect(a.db)
     rows = conn.cursor().execute(QUERY).fetchall()
     conn.close()
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)

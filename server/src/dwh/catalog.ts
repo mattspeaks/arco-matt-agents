@@ -3,18 +3,19 @@ import { existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { config, DATA_DIR, REPO_ROOT } from '../config.js';
 
-// A read-only catalog of the DWH (every gold and silver table / view and its columns, as TSV), refreshed by the app
+// A read-only catalog of the DWH (every gold, silver and source-bronze table / view and its columns, as TSV), refreshed by the app
 // with one fixed metadata query (server/scripts/dwh_catalog.py). The Power BI builder greps it to tell a column that's
 // missing from gold from one that's in gold but not in the semantic model. Agents never get a SQL connection.
 
-export const CATALOG_DBS = ['gold', 'silver'] as const;
+// Gold, silver and the source bronze databases (bronze_confidential is deliberately left out: config.dwh.catalogDatabases).
+export const catalogDbs = () => config.dwh.catalogDatabases;
 const SCRIPT = resolve(REPO_ROOT, 'server/scripts/dwh_catalog.py');
 const MAX_AGE_MS = 24 * 3600_000;
 
 export const catalogPath = (db: string) => join(DATA_DIR, 'catalog', `${db}.tsv`);
 
 export function catalogStatus() {
-  return CATALOG_DBS.map((db) => {
+  return catalogDbs().map((db) => {
     const p = catalogPath(db);
     return { db, path: p, asOf: existsSync(p) ? statSync(p).mtime.toISOString() : null };
   });

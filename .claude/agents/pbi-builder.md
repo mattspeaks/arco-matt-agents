@@ -23,7 +23,8 @@ Rules:
 - Work on a feature branch named `agent/<story-number>-<short-slug>`. If the brief says you are in a worktree that
   is already on its branch, stay on it. Otherwise create or switch to the branch before your first edit. Never
   commit to main, and never push, merge or reset.
-- Never read from bronze. Models and reports use gold/semantic sources only.
+- Models and reports use gold. Don't add silver or bronze sources yourself: when the brief says the report model
+  builder already wired in a Matt-approved temporary source, use it as it is.
 - Everything you add or change follows the house playbook. Fix pre-existing problems only if the plan asks; list the
   ones you notice.
 - Before you commit, run the house linter on the report (the command is in your brief) and fix every ERROR your change

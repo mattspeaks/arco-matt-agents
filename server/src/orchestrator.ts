@@ -149,13 +149,17 @@ Changing course:
   with a finished build and no Review card.
 - Something the workflow can't do: tell Matt before doing anything else, rather than working around it.
 
-Data gaps: when the builder finds data the work needs that isn't in the semantic model or in gold, the app shows a
-Data gaps card listing every gap: a table missing from gold, a column missing from a gold table, or something in gold
-that isn't in the model. Derivable items are listed too, but they aren't gaps. A blocking gap stops the build: after
-the Data gaps card, Matt gets a Proceed or pause card. If he clicks Create data-gaps story, his message asks for ONE
-story ("Data Gaps for - STRY… - …", current sprint or backlog as he chose) covering every real gap. Check details
-against the catalogs in \`data/catalog/\` (gold.tsv, silver.tsv: tab-separated object, kind, column, type), put it on
-an approval card, and end your turn. If he paused, the work waits: when he says the gaps are resolved, propose a
+Model first: every round starts with the report model builder (\`pbi-report-model-builder\`), working only on this
+report's own semantic model. It reads ARCO_Gold_Ontology (\`data/ontology/\`) and the catalogs, maps name confusion,
+derives what it can in the model, adds what's in gold, and hands the finished model to pbi-builder. Its model QC runs
+when the model changed.
+Data gaps: data that isn't in gold under any name. The app shows a Data gaps card (derivable items are listed too, but
+they aren't gaps). A blocking gap stops the work: after the Data gaps card, Matt gets a Proceed-or-pause card with
+three choices: pause, proceed with the silver / bronze sources the model builder proposed (each marked temporary in
+the model), or proceed without. If he clicks Create data-gaps story, his message asks for ONE story
+("Data Gaps for - STRY… - …", current sprint or backlog as he chose) covering every real gap, including the proposed
+sources. Check details against the catalogs in \`data/catalog/\` (tab-separated object, kind, column, type; gold,
+silver and source bronze) and the ontology, put it on an approval card, and end your turn. If he paused, the work waits: when he says the gaps are resolved, propose a
 rebuild with \`submit_revision\`, which checks the data again. Gaps are also in \`get_report_flow\`.
 
 Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When

@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
-import { GapsCard, PublishCard, ReviewCard, TimeEntryCard, useDecide } from './FlowCards';
+import { GapsCard, ProceedCard, PublishCard, ReviewCard, TimeEntryCard, useDecide } from './FlowCards';
 import { useCardState } from '../cardState';
 
 const KIND_LABEL: Record<Run['kind'], string> = { sync: 'Sync', orchestrator: 'Chat', worker: 'Worker', sn_write: 'SN write' };
@@ -111,6 +111,7 @@ export function ApprovalCard({ approval, onError }: { approval: Approval; onErro
   if (approval.kind === 'pbi_publish') return <PublishCard approval={approval} onError={onError} />;
   if (approval.kind === 'time_entry') return <TimeEntryCard approval={approval} onError={onError} />;
   if (approval.kind === 'pbi_gaps') return <GapsCard approval={approval} onError={onError} />;
+  if (approval.kind === 'pbi_proceed') return <ProceedCard approval={approval} onError={onError} />;
   return <BasicApprovalCard approval={approval} onError={onError} />;
 }
 

@@ -12,7 +12,7 @@ anything that was already there is **PRE-EXISTING (out of scope)**. List it with
 ## Rules you judge (the linter can't)
 | ID | Rule | Method |
 |---|---|---|
-| QC-01 | No partition or query reads from **bronze** | TMDL partitions and M/SQL expressions: bronze lakehouse, schema or table references (`bronze`, `brz_`). New ones FAIL; existing ones are PRE-EXISTING |
+| QC-01 | Models read gold; silver / bronze only as an approved temporary source | TMDL partitions and M/SQL expressions: silver or bronze references (`silver`, `bronze`, `brz_`). A new one FAILS, unless your brief lists it as a source Matt approved AND its table carries an `ARCO_TemporarySource` annotation: then PASS with a note. `bronze_confidential` always FAILS. Existing ones are PRE-EXISTING |
 | QC-02 | Reports connect only to approved gold / semantic sources | `definition.pbir` connection and model sources |
 | QC-03 | Model passes Best Practice Analyzer | **SKIPPED**: Tabular Editor CLI isn't installed |
 | QC-04 | Theme and colors follow the house palettes | Report theme vs `arco-dwh-powerbi/assets/theme/ABS_Custom_Theme.json`; table / KPI fills use house RAG; charts use the theme order, or the CIO color-blind palette for CIO / IT reports (`references/color-palettes.md`) |
@@ -27,4 +27,5 @@ anything that was already there is **PRE-EXISTING (out of scope)**. List it with
 | QC-13 | Finance rules | Stories touching WIP, backlog, revenue, GP, billing or financial statements follow `wip-accounting-rules.md`, including the open Gold-bug workarounds in its section 7 |
 | QC-14 | No PII added | New model columns don't expose sensitive personal data (remove, don't hide); business free text flagged Sensitive in descriptions (`gold-semantic-models.md` PII) |
 | QC-15 | Replace, never layer | When new logic replaces old, no leftover old filters, measures, titles, tooltips or bookmarks remain (`SKILL.md` non-negotiable 20) |
+| QC-17 | The model fits the ontology | For model changes: joins only on ARCO_Gold_Ontology's declared relationships (`relationships.tmdl`), grain and keys as its entity descriptions say, every numbered TRAP respected (e.g. AP is owed by AP Company, not the job's company; never sum GL month balances across months; compare padded account codes raw on both sides), nothing it flags sensitive exposed. The ontology path is in your brief |
 | QC-16 | Needs a visual check | You can't see the report. List what Matt should check in Desktop: KPI clipping, truncated titles, overlaps, horizontal scroll, empty visuals. This is never a FAIL on its own |

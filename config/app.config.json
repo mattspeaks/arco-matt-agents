@@ -10,17 +10,35 @@
     "storyTable": "rm_story",
     "timesheetPortalUrl": "https://arcoconstruction.service-now.com/tcp?sysparm_domain_restore=false&sysparm_stack=no",
     "routingTags": {
-      "pbi": ["#PowerBI", "#Report", "#SemanticModel"],
-      "dwh": ["#NewTable", "#DWH", "#Pipeline"]
+      "pbi": [
+        "#PowerBI",
+        "#Report",
+        "#SemanticModel"
+      ],
+      "dwh": [
+        "#NewTable",
+        "#DWH",
+        "#Pipeline"
+      ]
     },
     "lanes": {
       "ready": "Ready",
       "agentInProgress": "Work in progress",
       "agentReview": "Ready for testing"
     },
-    "agentAllowedTargetStates": ["Work in progress", "Ready for testing"],
-    "agentAllowedStateValues": ["2", "-7"],
-    "agentCreateStateValues": ["-10", "-6", "1"],
+    "agentAllowedTargetStates": [
+      "Work in progress",
+      "Ready for testing"
+    ],
+    "agentAllowedStateValues": [
+      "2",
+      "-7"
+    ],
+    "agentCreateStateValues": [
+      "-10",
+      "-6",
+      "1"
+    ],
     "laneOrder": [
       "Backlog",
       "Draft",
@@ -39,36 +57,161 @@
     "orchestratorModel": "opus",
     "defaultWorkerModel": "sonnet"
   },
-  "projectRoots": ["C:/Users/mspeaks/source/repos"],
+  "projectRoots": [
+    "C:/Users/mspeaks/source/repos"
+  ],
+  "dwh": {
+    "catalogDatabases": [
+      "gold",
+      "silver",
+      "Bronze_Viewpoint",
+      "bronze_procore",
+      "bronze_textura",
+      "bronze_ukg",
+      "bronze_concur",
+      "bronze_servicenow",
+      "bronze_counsellink",
+      "bronze_greenhouse",
+      "bronze_icims",
+      "bronze_mycoi",
+      "bronze_arco_hub",
+      "bronze_budget_app"
+    ],
+    "ontology": {
+      "workspaceId": "7edf4894-85d9-4c6f-a06d-300bbaa66edb",
+      "name": "ARCO_Gold_Ontology"
+    }
+  },
   "closeoutChecklist": [
-    { "label": "Report published to the App for business review" },
-    { "label": "PRs completed", "auto": "pr" },
-    { "label": "Published to Production" },
-    { "label": "Final adjustments and sign-off" }
+    {
+      "label": "Report published to the App for business review"
+    },
+    {
+      "label": "PRs completed",
+      "auto": "pr"
+    },
+    {
+      "label": "Published to Production"
+    },
+    {
+      "label": "Final adjustments and sign-off"
+    }
   ],
   "powerbi": {
     "repoPath": "C:/Users/mspeaks/source/repos/PowerBI",
     "worktreeRoot": "C:/Users/mspeaks/source/repos/PowerBI-agent-worktrees",
     "baseBranch": null,
     "workspaceFolders": {},
-    "lint": { "enabled": true, "python": "py", "script": ".claude/skills/arco-dwh-powerbi/scripts/check_pbir.py" },
-    "nonProductionWorkspacePatterns": ["Acceptance", "Development", "\\bDEV\\b", "\\bDev\\b", "\\bTest\\b", "\\bPOC\\b", "Sandbox"],
-    "blockedWorkspacePatterns": ["\\bTEST\\b", "\\bPROD\\b", "\\bProduction\\b", "\\bUAT\\b"]
+    "lint": {
+      "enabled": true,
+      "python": "py",
+      "script": ".claude/skills/arco-dwh-powerbi/scripts/check_pbir.py"
+    },
+    "nonProductionWorkspacePatterns": [
+      "Acceptance",
+      "Development",
+      "\\bDEV\\b",
+      "\\bDev\\b",
+      "\\bTest\\b",
+      "\\bPOC\\b",
+      "Sandbox"
+    ],
+    "blockedWorkspacePatterns": [
+      "\\bTEST\\b",
+      "\\bPROD\\b",
+      "\\bProduction\\b",
+      "\\bUAT\\b"
+    ]
   },
   "workers": {
     "pbi-qc": {
       "domain": "pbi",
       "requiresApproval": false,
       "readOnly": true,
-      "allowedTools": ["Read", "Grep", "Glob", "Skill"],
-      "disallowedTools": ["Edit", "Write", "NotebookEdit", "Bash", "WebFetch", "WebSearch", "Task", "Agent"]
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Skill"
+      ],
+      "disallowedTools": [
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "Bash",
+        "WebFetch",
+        "WebSearch",
+        "Task",
+        "Agent"
+      ]
     },
     "pbi-builder": {
       "domain": "pbi",
       "requiresApproval": true,
       "readOnly": false,
-      "allowedTools": ["Read", "Grep", "Glob", "Skill", "Edit", "Write", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git branch:*)", "Bash(git switch:*)", "Bash(git checkout -b:*)", "Bash(git add:*)", "Bash(git commit:*)", "Bash(git -C:*)", "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)"],
-      "disallowedTools": ["Bash(git push:*)", "Bash(git merge:*)", "Bash(git reset:*)", "Bash(git rebase:*)", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Agent"]
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Skill",
+        "Edit",
+        "Write",
+        "Bash(git status:*)",
+        "Bash(git diff:*)",
+        "Bash(git log:*)",
+        "Bash(git branch:*)",
+        "Bash(git switch:*)",
+        "Bash(git checkout -b:*)",
+        "Bash(git add:*)",
+        "Bash(git commit:*)",
+        "Bash(git -C:*)",
+        "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)"
+      ],
+      "disallowedTools": [
+        "Bash(git push:*)",
+        "Bash(git merge:*)",
+        "Bash(git reset:*)",
+        "Bash(git rebase:*)",
+        "NotebookEdit",
+        "WebFetch",
+        "WebSearch",
+        "Task",
+        "Agent"
+      ]
+    },
+    "pbi-report-model-builder": {
+      "domain": "pbi",
+      "requiresApproval": true,
+      "readOnly": false,
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Skill",
+        "Edit",
+        "Write",
+        "Bash(git status:*)",
+        "Bash(git diff:*)",
+        "Bash(git log:*)",
+        "Bash(git branch:*)",
+        "Bash(git switch:*)",
+        "Bash(git checkout -b:*)",
+        "Bash(git add:*)",
+        "Bash(git commit:*)",
+        "Bash(git -C:*)",
+        "Bash(py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py:*)"
+      ],
+      "disallowedTools": [
+        "Bash(git push:*)",
+        "Bash(git merge:*)",
+        "Bash(git reset:*)",
+        "Bash(git rebase:*)",
+        "NotebookEdit",
+        "WebFetch",
+        "WebSearch",
+        "Task",
+        "Agent"
+      ]
     }
   }
 }

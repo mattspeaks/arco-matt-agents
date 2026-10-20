@@ -15,7 +15,11 @@ Project rules for every Claude session in this repo: the orchestrator, workers, 
   and only after Matt confirms a Publish card. It opens the PR and never merges it.
 - Fabric publishing is done by the app (`server/src/pbi/flow.ts`), only to the workspace Matt picks on the Publish
   card, and never to a workspace matching `powerbi.blockedWorkspacePatterns`.
-- Models and reports never read from bronze.
+- Models and reports read gold. A silver or source-bronze table is allowed only when Matt approves that exact source
+  on a report's Proceed-or-pause card, as a temporary bridge for a data gap. It's marked in the model
+  (`annotation ARCO_TemporarySource`) to repoint to gold once the data-gaps story is done. Never `bronze_confidential`.
+- `pbi-report-model-builder` works only on the one report's own semantic model. Never shared Gold models, the
+  ontology, or the DWH.
 - No secrets in the repo. Auth is Windows (SQL Server) and the user's Claude Code login.
 
 ## Developing the app

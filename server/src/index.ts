@@ -13,6 +13,7 @@ import { getCurrentTimesheet, getLanes, getSprintScore, getStory, getTimesheet, 
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
 import { catalogStatus, ensureCatalog } from './dwh/catalog.js';
+import { ensureOntology, ontologyStatus } from './dwh/ontology.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
@@ -118,10 +119,10 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean; sprint?: 'current' | 'backlog' } }>(
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean; sprint?: 'current' | 'backlog'; choice?: 'sources' | 'without' } }>(
   '/api/approvals/:id/decision',
   async (req) =>
-    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart, confirmProduction: req.body?.confirmProduction === true, sprint: req.body?.sprint === 'current' ? 'current' : 'backlog' }),
+    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart, confirmProduction: req.body?.confirmProduction === true, sprint: req.body?.sprint === 'current' ? 'current' : 'backlog', choice: req.body?.choice === 'sources' ? 'sources' : req.body?.choice === 'without' ? 'without' : undefined }),
 );
 
 // ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------
@@ -144,6 +145,9 @@ app.get('/api/workers', async () => listWorkers());
 // The read-only DWH catalog the builder greps (dwh/catalog.ts).
 app.get('/api/catalog', async () => catalogStatus());
 app.post('/api/catalog/refresh', async () => ensureCatalog(true));
+// The read-only ARCO_Gold_Ontology copy the report model builder reads (dwh/ontology.ts).
+app.get('/api/ontology', async () => ontologyStatus());
+app.post('/api/ontology/refresh', async () => ensureOntology(true));
 
 // ---- Agent API (called only by the arco MCP server the orchestrator runs) ---------------------
 type AgentBody = Record<string, unknown> & { parentRunId?: string | null };

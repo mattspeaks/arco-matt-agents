@@ -38,6 +38,12 @@ export interface AppConfig {
   };
   claude: { bin: string; syncModel: string; orchestratorModel: string; defaultWorkerModel: string };
   projectRoots: string[];
+  dwh: {
+    /** Databases the read-only catalog covers (dwh/catalog.ts); the report model builder greps them. */
+    catalogDatabases: string[];
+    /** The Fabric IQ ontology the report model builder reads (dwh/ontology.ts). */
+    ontology: { workspaceId: string; name: string };
+  };
   /** Matt's default close-out list for a story; auto: 'pr' items tick themselves when the story's PR completes. */
   closeoutChecklist: { label: string; auto?: 'pr' }[];
   powerbi: {

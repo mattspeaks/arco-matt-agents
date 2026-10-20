@@ -14,6 +14,7 @@ import { askTimeEntry } from '../timesheet.js';
 import { startCloseout } from '../closeout.js';
 import { lintBranch, lintSummary, type LintDiff } from './lint.js';
 import { catalogPath, ensureCatalog } from '../dwh/catalog.js';
+import { ensureOntology } from '../dwh/ontology.js';
 import { createItem, getDefinition, listItems, listWorkspaces, renameItem, updateDefinition, type Workspace } from '../fabric/client.js';
 import { findItemFolder, parseModelRef, partText, pbirByConnection, pbirByPath, readParts, textPart, writeParts, writePbip } from '../fabric/pbip.js';
 import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, git, headSha, mergeBase, openPullRequest, pushBranch, refExists, showAt, slugify } from './repo.js';
@@ -26,8 +27,9 @@ import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, 
 
 // final_qc: Matt approved the review; pbi-qc checks exactly what will be published before the Publish card.
 // gaps: the builder stopped on blocking data gaps; waiting for Matt (story? then proceed or pause).
-export type Stage = 'pulling' | 'building' | 'gaps' | 'idle' | 'review' | 'revising' | 'final_qc' | 'publishing' | 'published' | 'failed';
-const ACTIVE: Stage[] = ['pulling', 'building', 'final_qc', 'publishing'];
+// modeling: the report model builder (pbi-report-model-builder) works on the report's own model before the report loop.
+export type Stage = 'pulling' | 'modeling' | 'building' | 'gaps' | 'idle' | 'review' | 'revising' | 'final_qc' | 'publishing' | 'published' | 'failed';
+const ACTIVE: Stage[] = ['pulling', 'modeling', 'building', 'final_qc', 'publishing'];
 
 export interface FlowData {
   conversationId: string;
@@ -61,6 +63,10 @@ export interface FlowData {
   lastQc?: { verdict?: string; result: string };
   /** Data the work needs that isn't in the semantic model or in gold, as reported by the builder this round. */
   gaps?: DataGap[];
+  /** The report model builder's notes for the report builder: what's in the model for this report. */
+  modelHandoff?: string;
+  /** Matt's decision on blocking gaps: build with the proposed (silver / bronze) sources, or without. */
+  gapDecision?: { choice: 'sources' | 'without'; approvedSources?: (ProposedSource & { gap: string })[]; at: string; note?: string };
   /** Matt chose to build what's possible despite blocking gaps (Proceed on the Proceed-or-pause card). */
   proceedDespiteGaps?: boolean;
   /** Matt paused the work until the gaps are resolved; the next rebuild checks again. */
@@ -101,7 +107,18 @@ export interface DataGap {
   checked?: string;
   /** For derivable: how it will be computed */
   derivation?: string;
+  /** For real gaps: where the data could come from instead (silver first, then source bronze) */
+  proposedSources?: ProposedSource[];
   notes?: string;
+}
+
+export interface ProposedSource {
+  /** db.schema.table, e.g. silver.viewpoint.bAPTD */
+  object: string;
+  column?: string;
+  layer?: string;
+  join?: string;
+  why?: string;
 }
 
 const realGaps = (gaps: DataGap[] = []) => gaps.filter((g) => g.kind !== 'derivable');
@@ -127,6 +144,18 @@ export function parseGaps(result: string): DataGap[] {
         blocking: g.kind !== 'derivable' && Boolean(g.blocking),
         checked: typeof g.checked === 'string' ? g.checked.trim().slice(0, 300) || undefined : undefined,
         derivation: typeof g.derivation === 'string' ? g.derivation.trim().slice(0, 300) || undefined : undefined,
+        proposedSources: Array.isArray(g.proposed_sources ?? g.proposedSources)
+          ? ((g.proposed_sources ?? g.proposedSources) as Record<string, unknown>[])
+              .filter((s) => s && typeof s.object === 'string' && s.object.trim() && !/bronze_confidential/i.test(String(s.object)))
+              .slice(0, 5)
+              .map((s) => ({
+                object: String(s.object).trim(),
+                column: typeof s.column === 'string' ? s.column.trim() || undefined : undefined,
+                layer: typeof s.layer === 'string' ? s.layer.trim() || undefined : undefined,
+                join: typeof s.join === 'string' ? s.join.trim().slice(0, 200) || undefined : undefined,
+                why: typeof s.why === 'string' ? s.why.trim().slice(0, 200) || undefined : undefined,
+              }))
+          : undefined,
         notes: typeof g.notes === 'string' ? g.notes.trim().slice(0, 300) || undefined : undefined,
       }));
   } catch {
@@ -576,6 +605,8 @@ type CardPayload = Record<string, string> & { conversationId: string; storyNumbe
 
 /** Called by approvals.decide before the card is marked. Throwing leaves the card pending. Returns the outcome text. */
 export interface PublishChoice {
+  /** Proceed-or-pause card: build with the proposed sources, or without the missing data. */
+  choice?: 'sources' | 'without';
   /** Data gaps card: put the story in the current sprint or the backlog. */
   sprint?: 'current' | 'backlog';
   workspaceId?: string;
@@ -622,7 +653,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     await saveFlow(story, 'pulling', data);
     void pipeline(story, approval.id, async () => {
       await prepare(story);
-      await buildLoop(story);
+      await runRound(story);
     });
     return 'Approved: setting up the branch, then building';
   }
@@ -664,13 +695,13 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       permitApprovalId: approval.id,
       error: undefined,
       // After a pause for data gaps, the rebuild checks the data again (and stops again if they're still missing).
-      ...(flow.data.pausedForGaps ? { pausedForGaps: false, proceedDespiteGaps: false } : {}),
+      ...(flow.data.pausedForGaps ? { pausedForGaps: false, proceedDespiteGaps: false, gapDecision: undefined } : {}),
     };
     await supersedeFlowCards(story);
     await saveFlow(story, data.worktree ? 'building' : 'pulling', data);
     void pipeline(story, approval.id, async () => {
       if (!data.worktree) await prepare(story);
-      await buildLoop(story);
+      await runRound(story);
     });
     return 'Approved: rebuilding';
   }
@@ -704,15 +735,32 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
   }
 
   if (approval.kind === 'pbi_proceed') {
-    if (approve) {
+    const choice = approve ? (extra.choice === 'sources' ? 'sources' : 'without') : 'pause';
+    if (choice !== 'pause') {
       assertNotActive(story, flow);
-      const data: FlowData = { ...flow.data, proceedDespiteGaps: true, pausedForGaps: false, error: undefined };
-      await saveFlow(story, 'building', data);
-      await postAppNote(p.conversationId, `Proceeding: the builder will build everything that doesn't depend on the data gaps and leave out the parts that do, then QC and a Review card as usual.`);
-      void pipeline(story, approval.id, () => buildLoop(story));
-      return 'Proceeding with what is possible';
+      const approvedSources =
+        choice === 'sources'
+          ? blockingGaps(flow.data.gaps).flatMap((g) => (g.proposedSources ?? []).map((s) => ({ ...s, gap: `${g.object}${g.column ? `.${g.column}` : ''}` })))
+          : undefined;
+      if (choice === 'sources' && !approvedSources?.length) throw new Error('No sources were proposed for these gaps; choose Proceed without, or Pause');
+      const data: FlowData = {
+        ...flow.data,
+        proceedDespiteGaps: true,
+        pausedForGaps: false,
+        error: undefined,
+        gapDecision: { choice, approvedSources, at: new Date().toISOString().slice(0, 10), note },
+      };
+      await saveFlow(story, 'modeling', data);
+      await postAppNote(
+        p.conversationId,
+        choice === 'sources'
+          ? `Proceeding with the proposed sources: the report model builder wires in ${approvedSources!.length} source${approvedSources!.length === 1 ? '' : 's'}, each marked temporary in the model until the data-gaps story is done. Then the report loop runs as usual.`
+          : `Proceeding without the missing data: the model and report are built without the parts that need it (they're listed, not faked), then QC and a Review card as usual.`,
+      );
+      void pipeline(story, approval.id, () => runRound(story));
+      return choice === 'sources' ? 'Proceeding with the proposed sources' : 'Proceeding without the gaps';
     }
-    await saveFlow(story, 'idle', { ...flow.data, pausedForGaps: true, proceedDespiteGaps: false });
+    await saveFlow(story, 'idle', { ...flow.data, pausedForGaps: true, proceedDespiteGaps: false, gapDecision: undefined });
     await postAppNote(p.conversationId, `Paused until the data gaps are resolved. When they are, ask the orchestrator here to rebuild; it'll check the data again first.`);
     return 'Paused for data gaps';
   }
@@ -899,10 +947,12 @@ async function buildLoop(story: string) {
 
   const current = await getFlow(story);
   if (current?.stage !== 'building') return;
-  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint), gaps };
+  // The model builder's gaps stay; the report builder's are added. Only gaps nobody has offered yet get a new card.
+  const known = new Set((current.data.gaps ?? []).map(gapKey));
+  const fresh = gaps.filter((g) => !known.has(gapKey(g)));
+  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint), gaps: mergeGaps(current.data.gaps, gaps) };
   await saveFlow(story, 'review', next);
-  // Non-blocking gaps: offered as a story, ahead of the Review card. (Already offered when the loop stopped on them.)
-  if (realGaps(gaps).length && !current.data.proceedDespiteGaps) await raiseGapsCard(story, next, gaps, false);
+  if (realGaps(fresh).length && !current.data.proceedDespiteGaps) await raiseGapsCard(story, next, fresh, false);
   await raiseReviewCard(story, next, qc);
 }
 
@@ -930,6 +980,7 @@ function builderBrief(story: string, d: FlowData, pass: number, findings?: strin
     `## Plan (approved by Matt)\n${d.plan}`,
     d.revisions.length && `## Revisions Matt asked for\n${d.revisions.map((r, i) => `### Round ${i + 2}\n${r}`).join('\n\n')}`,
     findings && `## QC findings to fix\n${findings}`,
+    d.modelHandoff && `## The model is ready (from the report model builder)\n${d.modelHandoff}\n\nBuild the report on this model. Don't change its tables, sources or relationships; add report-level measures if you need them. Only report data gaps for things truly missing from the model.`,
     d.proceedDespiteGaps && d.gaps?.length && `## Matt chose to proceed despite these data gaps\n${gapsMarkdown(d.gaps)}\n\nBuild everything that doesn't depend on them. Leave out the parts that do (no placeholder or invented data) and list them under Open questions. Still end with a data-gaps block.`,
     [
       '## Where',
@@ -955,6 +1006,7 @@ function qcBrief(story: string, d: FlowData, pass: number, files: string[], stat
     `## House linter (the app ran it on the branch and on its starting point)\n${lint}\n\nThe linter covers the mechanical house rules. Report its new findings in your table, don't re-derive them, and spend your review on the rules it can't check (see qc-rules.md).`,
     `## Plan\n${d.plan}`,
     d.revisions.length && `## Revisions\n${d.revisions.join('\n\n')}`,
+    approvedSourcesText(d),
     previous && `## Previous QC findings: confirm each one is fixed\n${previous}`,
   ]
     .filter(Boolean)
@@ -1315,18 +1367,162 @@ async function raiseProceedCard(story: string, d: FlowData) {
   const blocking = blockingGaps(d.gaps);
   const card = await createApproval({
     kind: 'pbi_proceed',
-    title: `${story}: proceed without ${blocking.length} blocking data gap${blocking.length === 1 ? '' : 's'}, or pause?`,
+    title: `${story}: ${blocking.length} blocking data gap${blocking.length === 1 ? '' : 's'}: proceed or pause?`,
     payload: {
       conversationId: d.conversationId,
       storyNumber: story,
       preview: [
-        `The builder stopped because ${blocking.length === 1 ? 'this is' : 'these are'} missing:`,
+        `The work stopped because ${blocking.length === 1 ? 'this is' : 'these are'} missing from gold:`,
         gapsMarkdown(blocking),
-        "**Proceed:** build everything that doesn't depend on the gaps (no placeholder data; the parts that need them are left out and listed), then QC and a Review card as usual.",
+        sourcesMarkdown(blocking),
+        "**Proceed with these sources:** the report model builder wires in exactly the sources above, each marked temporary in the model (approved by you, to repoint to gold when the data-gaps story is done). Then the report loop as usual.",
+        "**Proceed without:** build everything that doesn't depend on the gaps (no placeholder data; the parts that need them are left out and listed), then QC and a Review card as usual.",
         "**Pause:** nothing more is built. When the gaps are resolved, ask the orchestrator here to rebuild; it checks the data again first.",
       ].join('\n\n'),
+      hasSources: blocking.some((g) => g.proposedSources?.length) ? '1' : '',
     },
     requestedByRunId: null,
   });
   await postApprovalCard(d.conversationId, card.id);
+}
+
+// ---- the report model step (pbi-report-model-builder) ------------------------------------------------
+
+/** One round: the report model builder on the report's own model, then (unless it stopped on gaps) the report loop. */
+async function runRound(story: string) {
+  if (await modelStep(story)) await buildLoop(story);
+}
+
+/** The `## Model handoff` section of the model builder's result (up to the data-gaps block). */
+export function handoffOf(result: string): string | undefined {
+  const m = /##\s*Model handoff\s*\n([\s\S]*?)(?:```data-gaps|$)/i.exec(result);
+  return m?.[1]?.trim().slice(0, 6000) || undefined;
+}
+
+export function sourcesMarkdown(gaps: DataGap[]): string {
+  const rows = gaps.flatMap((g) => (g.proposedSources ?? []).map((s) => ({ g, s })));
+  if (!rows.length) return '_No alternative sources were proposed._';
+  return [
+    '**Proposed sources (silver first, then source bronze)**',
+    ...rows.map(
+      ({ g, s }) =>
+        `- For \`${g.object}${g.column ? `.${g.column}` : ''}\`: \`${s.object}${s.column ? `.${s.column}` : ''}\`${s.layer ? ` (${s.layer})` : ''}${s.join ? `, joined on ${s.join}` : ''}${s.why ? `. ${s.why}` : ''}`,
+    ),
+  ].join('\n');
+}
+
+/** For QC: tables reading these sources are Matt-approved temporary exceptions (QC-01 passes them with a note). */
+function approvedSourcesText(d: FlowData): string | false {
+  const srcs = d.gapDecision?.choice === 'sources' ? d.gapDecision.approvedSources : undefined;
+  if (!srcs?.length) return false;
+  return `## Temporary sources Matt approved on ${d.gapDecision!.at}\nThese silver / bronze sources are approved exceptions to the gold-only rule, each to be marked in the model with an \`ARCO_TemporarySource\` annotation. Pass them with a note (QC-01); any OTHER silver / bronze source still fails.\n${srcs.map((s) => `- ${s.object}${s.column ? `.${s.column}` : ''} (for ${s.gap})`).join('\n')}`;
+}
+
+function modelBrief(story: string, d: FlowData, pass: number, catalog: { db: string; path: string; asOf: string | null }[], ontology: { path: string; asOf: string | null; entities: number; error?: string }, findings?: string): string {
+  const wt = d.worktree!;
+  const decision = d.gapDecision;
+  return [
+    pass === 1
+      ? `Story ${story}${d.round > 1 ? `, round ${d.round}` : ''}: build the semantic model for the report below so the report builder can build the report on it.`
+      : `Story ${story}: fix the model QC findings below. Change only what they require.`,
+    `## Plan (approved by Matt)\n${d.plan}`,
+    d.revisions.length && `## Revisions Matt asked for\n${d.revisions.map((r, i) => `### Round ${i + 2}\n${r}`).join('\n\n')}`,
+    findings && `## Model QC findings to fix\n${findings}`,
+    decision?.choice === 'sources' &&
+      `## Matt approved these temporary sources (${decision.at})${decision.note ? `: "${decision.note}"` : ''}\nWire in exactly these, nothing else, each table marked with \`annotation ARCO_TemporarySource\` (see your instructions):\n${(decision.approvedSources ?? []).map((s) => `- ${s.object}${s.column ? `.${s.column}` : ''} for ${s.gap}${s.join ? ` (join: ${s.join})` : ''}`).join('\n')}`,
+    decision?.choice === 'without' &&
+      `## Matt chose to proceed without the missing data${decision.note ? `: "${decision.note}"` : ''}\nBuild everything that doesn't depend on these gaps and list what's left out:\n${gapsMarkdown(blockingGaps(d.gaps))}`,
+    [
+      '## Where',
+      `- Git worktree: ${wt}, on branch \`${d.branch}\` (stay on it).`,
+      `- Report: ${join(wt, d.reportDir!)} (read it for what the report uses today).`,
+      d.modelDir
+        ? `- The report's model (yours to change): ${join(wt, d.modelDir)}`
+        : `- This report has no model of its own in the repo (${d.thinReportNote ?? 'thin report'}). Don't create one unless the plan asks; report what's needed instead.`,
+      `- Ontology (ARCO_Gold_Ontology, ${ontology.entities} entities${ontology.asOf ? `, as of ${ontology.asOf.slice(0, 10)}` : ''}): ${ontology.asOf ? ontology.path : `not available (${ontology.error ?? 'unknown'}): rely on the catalogs and say so`}`,
+      `- Catalogs: ${catalog.filter((c) => c.asOf).map((c) => `\`${c.path}\``).join(', ') || 'none available'}`,
+      `- House linter (also parses the TMDL with Desktop's parser): \`py .claude/skills/arco-dwh-powerbi/scripts/check_pbir.py "${join(wt, d.reportDir!)}"\``,
+      `- Commit with \`git -C "${wt}" commit\` and a message starting with ${story}. Don't push.`,
+    ].join('\n'),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function modelQcBrief(story: string, d: FlowData, files: string[], lint: string, ontologyPath: string): string {
+  const wt = d.worktree!;
+  return [
+    `Story ${story}: QC of the report's SEMANTIC MODEL only (${basename(d.modelDir!)}), built by the report model builder. The report itself is built afterwards; don't review report visuals.`,
+    `Model: ${join(wt, d.modelDir!)}`,
+    `## Model files changed this step\n${files.map((f) => `- ${join(wt, f)}`).join('\n') || '- none'}`,
+    `## House linter (branch vs starting point)\n${lint}`,
+    `Check the changes against qc-rules.md (QC-01, QC-07, QC-08, QC-11, QC-13, QC-14, QC-17) and against the ontology at ${ontologyPath}: joins only on its declared relationships, grain and keys as its descriptions say, every TRAP it lists respected, nothing it flags sensitive exposed.`,
+    `## Plan\n${d.plan}`,
+    approvedSourcesText(d),
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/**
+ * The model step. Returns true when the report loop should follow, false when it stopped (blocking gaps, or the flow
+ * was stopped). Model QC runs only when the model changed; one fix pass if it fails.
+ */
+async function modelStep(story: string): Promise<boolean> {
+  const start = await getFlow(story);
+  if (!start?.data.worktree || !start.data.reportDir) throw new Error('The branch was never set up; start over with a new start card');
+  const d0 = start.data;
+  const wt = d0.worktree!;
+  await saveFlow(story, 'modeling', d0);
+  const [catalog, ontology] = await Promise.all([ensureCatalog(), ensureOntology()]);
+  const before = await headSha(wt);
+  const label = d0.round > 1 ? ` (round ${d0.round})` : '';
+
+  let result = '';
+  let findings: string | undefined;
+  for (let pass = 1; pass <= 2; pass++) {
+    await postAppNote(d0.conversationId, `Report model builder${pass > 1 ? ' (fixing model QC findings)' : ''}${label} started.`);
+    const m = await runWorker('pbi-report-model-builder', modelBrief(story, d0, pass, catalog, ontology, findings), story, wt, 'modeling');
+    if (!m) return false;
+    if (m.status !== 'succeeded') throw new Error(`Report model builder ${m.status}${m.error ? `: ${m.error}` : ''}`);
+    result = m.result ?? '';
+    await commitAll(wt, `${story}: report model builder (changes it left uncommitted)`);
+
+    const gaps = parseGaps(result);
+    const blocking = blockingGaps(gaps);
+    if (blocking.length && !d0.gapDecision) {
+      const cur = await getFlow(story);
+      if (cur?.stage !== 'modeling') return false;
+      const next: FlowData = { ...cur.data, gaps, modelHandoff: handoffOf(result) };
+      await saveFlow(story, 'gaps', next);
+      await postAppNote(
+        d0.conversationId,
+        `**Stopped:** the report model builder found ${blocking.length} blocking data gap${blocking.length === 1 ? '' : 's'} (data that isn't in gold under any name). It built what doesn't depend on ${blocking.length === 1 ? 'it' : 'them'}. Decide on the Data gaps card below, then choose: pause, proceed with its proposed sources, or proceed without.`,
+      );
+      await raiseGapsCard(story, next, gaps, true);
+      return false;
+    }
+
+    const modelFiles = d0.modelDir ? (await changedFiles(wt, before)).filter((f) => f.startsWith(d0.modelDir!)) : [];
+    if (!modelFiles.length) {
+      await postAppNote(d0.conversationId, `Report model builder: no model changes needed${gaps.length ? ` (${realGaps(gaps).length} gap(s) noted)` : ''}.`);
+      break;
+    }
+    const lint = await lintBranch({ worktree: wt, reportRel: d0.reportDir!, baseSha: diffBase(d0)! });
+    const q = await runWorker('pbi-qc', modelQcBrief(story, d0, modelFiles, lintSummary(lint), ontology.path), story, wt, 'modeling');
+    if (!q) return false;
+    const qc = withLint({ verdict: q.status === 'succeeded' ? parseMeta<{ verdict?: string }>(q).verdict : 'not run', result: q.result ?? '' }, lint);
+    await postAppNote(d0.conversationId, `Model QC${label}: **${qc.verdict ?? 'no verdict'}** (${modelFiles.length} model file(s) changed)${qc.verdict === 'PASS' || pass === 2 ? '' : '. Sending the findings back to the report model builder.'}`);
+    if (qc.verdict === 'PASS' || pass === 2) break;
+    findings = qc.result;
+  }
+
+  const cur = await getFlow(story);
+  if (cur?.stage !== 'modeling') return false;
+  const gaps = parseGaps(result);
+  const next: FlowData = { ...cur.data, gaps, modelHandoff: handoffOf(result) };
+  await saveFlow(story, 'building', next);
+  // Real but non-blocking gaps: offer the data-gaps story now; the report loop carries on.
+  if (realGaps(gaps).length && !cur.data.gapDecision) await raiseGapsCard(story, next, gaps, false);
+  return true;
 }

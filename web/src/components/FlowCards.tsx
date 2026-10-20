@@ -440,3 +440,40 @@ export function GapsCard({ approval, onError }: { approval: Approval; onError: (
     </div>
   );
 }
+
+/** After blocking data gaps (and the gaps-story decision): pause, proceed with the proposed sources, or proceed without. */
+export function ProceedCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
+  const p = parseJson<Record<string, string>>(approval.payload, {});
+  const { busy, decide } = useDecide(approval, onError);
+  const [note, setNote] = useCardState(approval.id, 'note', '');
+  const decidedLabel = approval.status === 'rejected' ? 'Paused' : (approval.outcome ?? 'Proceeding');
+  return (
+    <div className="approval pbi_proceed">
+      <div className="approval-kind small">Proceed or pause</div>
+      <div className="approval-title">{approval.title}</div>
+      {p.preview && (
+        <div className="approval-preview md small">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
+        </div>
+      )}
+      {approval.status === 'pending' ? (
+        <>
+          <input className="input small" placeholder="Note (optional, e.g. leave out one of the sources)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="approval-actions wrap">
+            <button className="btn primary" disabled={busy || !p.hasSources} title={p.hasSources ? '' : 'No sources were proposed'} onClick={() => void decide(true, { choice: 'sources', note })}>
+              Proceed with these sources
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={() => void decide(true, { choice: 'without', note })}>
+              Proceed without
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={() => void decide(false, { note })}>
+              Pause
+            </button>
+          </div>
+        </>
+      ) : (
+        <Decided approval={approval} label={decidedLabel} />
+      )}
+    </div>
+  );
+}
