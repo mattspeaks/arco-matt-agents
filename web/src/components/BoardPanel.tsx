@@ -191,12 +191,19 @@ function TimesheetView({ timesheet }: { timesheet: Timesheet | null }) {
 
   const switcher = (
     <div className="ts-weeks">
-      <div className="tabs small" role="tablist" aria-label="Week">
-        {([['Last week', 1], ['This week', 0]] as const).map(([label, i]) => (
-          <button key={label} role="tab" aria-selected={weeksBack === i} className={weeksBack === i ? 'tab active' : 'tab'} onClick={() => setWeeksBack(i)}>
-            {label}
-          </button>
-        ))}
+      <div className="ts-weeks-left">
+        <div className="tabs small" role="tablist" aria-label="Week">
+          {([['Last week', 1], ['This week', 0]] as const).map(([label, i]) => (
+            <button key={label} role="tab" aria-selected={weeksBack === i} className={weeksBack === i ? 'tab active' : 'tab'} onClick={() => setWeeksBack(i)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {(shown ?? timesheet)?.portalUrl && (
+          <a className="ts-portal-link" href={(shown ?? timesheet)!.portalUrl} target="_blank" rel="noreferrer" title="Open your timesheet in ServiceNow">
+            Open in ServiceNow ↗
+          </a>
+        )}
       </div>
       <button className="btn ghost small" disabled={syncing} onClick={refresh} title={`Ask the orchestrator to re-read the week of ${week} from ServiceNow`}>
         {syncing ? 'Refreshing…' : 'Refresh'}

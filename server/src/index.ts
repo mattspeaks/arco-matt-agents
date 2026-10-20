@@ -65,7 +65,7 @@ app.get('/api/board', async () => {
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
 app.get<{ Querystring: { week?: string } }>('/api/timesheet', async (req) => {
   if (req.query.week && !WEEK.test(req.query.week)) throw bad('week must be YYYY-MM-DD');
-  return getTimesheet(req.query.week);
+  return { ...(await getTimesheet(req.query.week)), portalUrl: config.servicenow.timesheetPortalUrl };
 });
 
 // Matt's Sync button: posts a visible request from him into the "ServiceNow refresh" chat, and the orchestrator

@@ -67,6 +67,8 @@ export interface Timesheet {
   /** The week shown (its Sunday, YYYY-MM-DD), and every week the app has a copy of. */
   week?: string | null;
   weeks?: string[];
+  /** Matt's ServiceNow timesheet page, for the "Open in ServiceNow" link. */
+  portalUrl?: string;
 }
 
 export type RunStatus = 'queued' | 'awaiting_approval' | 'running' | 'succeeded' | 'failed' | 'cancelled';

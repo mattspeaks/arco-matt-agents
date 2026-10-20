@@ -309,6 +309,9 @@ pre.note {
 .final-qc summary { cursor: pointer; }
 .final-qc .approval-preview { max-height: 320px; overflow: auto; }
 .ts-weeks { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 0; flex-wrap: wrap; }
+.ts-weeks-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ts-portal-link { font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.ts-portal-link:hover { text-decoration: underline; }
 .week-switch { display: flex; gap: 4px; margin: 4px 0; }
 .person-filter { flex: 0 1 180px; min-width: 120px; }
 .person-filter.active { border-color: var(--accent); }
