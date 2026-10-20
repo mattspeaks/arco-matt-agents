@@ -355,3 +355,41 @@ pre.note {
 @media (max-width: 1100px) { .score-sprint, .score-bar { display: none; } }
 @media (max-width: 760px) { .scoreboard { display: none; } }
 .approval-actions.wrap { flex-wrap: wrap; }
+
+/* Chat picker: working chats show a moving bar; chats with a pending card blink. */
+.chat-pick { position: relative; flex: 1; min-width: 0; }
+.chat-pick-button { position: relative; display: flex; align-items: center; gap: 6px; text-align: left; cursor: pointer; overflow: hidden; }
+.chat-pick-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-pick-pop {
+  position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; max-height: 60vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 4px 0;
+}
+.chat-pick-group ul { list-style: none; margin: 0; padding: 0; }
+.chat-pick-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 6px 12px 2px; }
+.chat-pick-row {
+  position: relative; display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 12px; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; overflow: hidden;
+}
+.chat-pick-row:hover { background: var(--panel-2); }
+.chat-pick-row.current { background: var(--accent-soft); }
+.chat-pick-tags { display: flex; gap: 4px; flex-shrink: 0; }
+.chat-tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+.chat-tag.working { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.chat-tag.waiting { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); font-weight: 600; }
+.chat-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--accent-soft); overflow: hidden; }
+.chat-progress::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 35%; background: var(--accent); border-radius: 2px;
+  animation: chat-progress 1.3s ease-in-out infinite;
+}
+@keyframes chat-progress { from { left: -35%; } to { left: 100%; } }
+.chat-pick-row.waiting { animation: chat-blink 1.1s ease-in-out infinite; }
+@keyframes chat-blink { 0%, 100% { background: transparent; } 50% { background: var(--warn-soft); } }
+.chat-pick-row.waiting.current { animation-name: chat-blink-current; }
+@keyframes chat-blink-current { 0%, 100% { background: var(--accent-soft); } 50% { background: var(--warn-soft); } }
+@media (prefers-reduced-motion: reduce) {
+  .chat-progress::after { animation: none; left: 0; width: 100%; opacity: .6; }
+  .chat-pick-row.waiting, .chat-pick-button.waiting { animation: none; background: var(--warn-soft); }
+}
+.chat-pick-button.waiting { animation: chat-blink-button 1.1s ease-in-out infinite; }
+@keyframes chat-blink-button { 0%, 100% { background: var(--panel); } 50% { background: var(--warn-soft); } }
+@media (prefers-reduced-motion: reduce) { .chat-pick-button.waiting { animation: none; background: var(--warn-soft); } }

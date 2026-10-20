@@ -111,6 +111,7 @@ export function App() {
         <ChatPanel
           conversations={conversations}
           approvals={approvals}
+          runs={runs}
           focus={chatFocus}
           onFocusConsumed={() => setChatFocus(null)}
           onOpenRun={setOpenRunId}

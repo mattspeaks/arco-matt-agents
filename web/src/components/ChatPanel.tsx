@@ -3,8 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api, fmtTime } from '../api';
 import { useRunEvents } from '../runEvents';
-import type { Approval, ChatMessage, Conversation } from '../types';
+import type { Approval, ChatMessage, Conversation, Run } from '../types';
 import { ApprovalCard } from './ActivityPanel';
+import { ChatPicker, chatStatuses } from './ChatPicker';
 import { CloseoutCard } from './CloseoutCard';
 
 const ACTIVE_KEY = 'arco.activeConversation';
@@ -20,6 +21,7 @@ function loadActive(): string | null {
 export function ChatPanel({
   conversations,
   approvals,
+  runs,
   focus,
   onFocusConsumed,
   onOpenRun,
@@ -27,6 +29,7 @@ export function ChatPanel({
 }: {
   conversations: Conversation[];
   approvals: Approval[];
+  runs: Run[];
   focus: { conversationId: string; draft?: string } | null;
   onFocusConsumed: () => void;
   onOpenRun: (id: string) => void;
@@ -41,9 +44,8 @@ export function ChatPanel({
   const { events } = useRunEvents(pendingRunId);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
-  const open = conversations.filter((c) => !c.archived_at);
   const [closeoutOpen, setCloseoutOpen] = useState(false);
-  const archived = conversations.filter((c) => c.archived_at);
+  const statuses = chatStatuses(conversations, runs, approvals);
 
   useEffect(() => {
     if (!activeId && conversations.length) setActiveId(conversations[0].id);
@@ -121,39 +123,7 @@ export function ChatPanel({
   return (
     <section className="panel chat-panel" aria-label="Orchestrator chat">
       <div className="panel-head">
-        <select className="input select" value={activeId ?? ''} onChange={(e) => setActiveId(e.target.value || null)} aria-label="Conversation">
-          {!conversations.length && <option value="">No conversations yet</option>}
-          {open.some((c) => !c.story_number) && (
-            <optgroup label="Main">
-              {open.filter((c) => !c.story_number).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {open.some((c) => c.story_number) && (
-            <optgroup label="Stories">
-              {open.filter((c) => c.story_number).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.busy_run_id ? '● ' : ''}
-                  {c.title}
-                  {c.closeout && !c.closeout.closed ? `  · close-out ${c.closeout.done}/${c.closeout.total}` : ''}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {archived.length > 0 && (
-            <optgroup label={`Archived (${archived.length})`}>
-              {archived.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.closeout?.closed ? '✓ ' : ''}
-                  {c.title}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+        <ChatPicker conversations={conversations} activeId={activeId} statuses={statuses} onPick={setActiveId} />
         <button className="btn ghost" onClick={() => void newConversation()}>
           + New
         </button>
