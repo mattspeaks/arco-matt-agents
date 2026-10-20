@@ -80,7 +80,8 @@
     "ontology": {
       "workspaceId": "7edf4894-85d9-4c6f-a06d-300bbaa66edb",
       "name": "ARCO_Gold_Ontology"
-    }
+    },
+    "repoPath": "C:/Users/mspeaks/source/repos/DWH/Data%20Warehouse"
   },
   "closeoutChecklist": [
     {
@@ -207,6 +208,27 @@
         "Bash(git reset:*)",
         "Bash(git rebase:*)",
         "NotebookEdit",
+        "WebFetch",
+        "WebSearch",
+        "Task",
+        "Agent"
+      ]
+    },
+    "dwh-gap-designer": {
+      "domain": "dwh",
+      "requiresApproval": false,
+      "readOnly": true,
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Skill"
+      ],
+      "disallowedTools": [
+        "Edit",
+        "Write",
+        "NotebookEdit",
+        "Bash",
         "WebFetch",
         "WebSearch",
         "Task",

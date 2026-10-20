@@ -220,7 +220,7 @@ export function ChatPanel({
           if (m.role === 'approval') {
             const approval = approvals.find((a) => a.id === m.content);
             // Report workflow cards live in the story chat as well as in Approvals.
-            if (approval && (approval.kind.startsWith('pbi_') || approval.kind === 'time_entry' || approval.kind === 'story_close')) {
+            if (approval && (approval.kind.startsWith('pbi_') || approval.kind === 'time_entry' || approval.kind === 'story_close' || approval.kind === 'gap_design')) {
               return (
                 <div key={m.id} className="chat-card">
                   <ApprovalCard approval={approval} onError={onError} />

@@ -162,6 +162,12 @@ sources. Check details against the catalogs in \`data/catalog/\` (tab-separated 
 silver and source bronze) and the ontology, put it on an approval card, and end your turn. If he paused, the work waits: when he says the gaps are resolved, propose a
 rebuild with \`submit_revision\`, which checks the data again. Gaps are also in \`get_report_flow\`.
 
+Working a Data Gaps story (its own story chat, "Data Gaps for - STRY… - …"): agree the plan with Matt (move it to
+Work in progress with an approval card as usual), then call \`start_gap_design\`. The read-only gap designer separates name
+confusion from real gaps and proposes gold column additions or new gold / silver tables as text. Nothing is built
+or written to the DWH. Its design comes back as a card; when Matt approves it, add it to the story as a work note
+(his message tells you how) and resync.
+
 Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When
 they're all done, he closes the story from the card, and the app has you add the final work note. Moving the story to
 Complete is his. Don't propose it. \`start_closeout\` puts the checklist up for a story that wasn't published through the

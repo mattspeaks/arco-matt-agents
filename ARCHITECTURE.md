@@ -366,6 +366,31 @@ rebuild card.
   - **Proceed without:** what's left out is listed, not faked.
 - **Handoff.** The model builder's `## Model handoff` goes into the report builder's brief, and the report builder
   doesn't change the model's tables, sources or relationships.
+- **Handback.** If the report builder finds the model missing something, or wrong, it ends its pass with a
+  `model-requests` block (measure / table / column / relationship / fix). The app runs the model step again with those
+  requests (model QC included), then repeats that builder pass on the updated model. That can happen at most twice per
+  round.
+- **The `arco-ontology` skill** (`.claude/skills/arco-ontology`) teaches the bots to read the ontology copy:
+  - entity → `backingTable` → the table's `schemaName`. Gold has many schemas: `analytics`, `servicenow_analytics`,
+    `greenhouse_analytics`, `ukg_analytics` and more;
+  - declared joins only;
+  - traps, sensitivity;
+  - the name-confusion procedure.
+
+### 5.3d Data Gaps stories: the gap designer (`.claude/agents/dwh-gap-designer.md`, `pbi/gapdesign.ts`)
+- In a "Data Gaps for - STRY…" story's chat, `start_gap_design` runs **dwh-gap-designer**. It's read-only (Read,
+  Grep, Glob, Skill) and uses the ontology skill, the catalogs, and the DWH repo's gold SQL as patterns.
+- **Its output is text only, for human review.** Nothing is written to the DWH, no SQL files, no objects. Per gap it
+  gives one of:
+  - **name confusion:** the mapping plus its evidence;
+  - **derivable**;
+  - a **gold column addition:** target table, column, source silver table and column, join, why;
+  - a **new gold table:** schema per the ontology, grain, key, columns with sources, joins, why;
+  - a **new silver table**, only if needed;
+  - **still unknown.**
+- **The design comes back as a card** in the gaps story chat. **Approve design** starts the turn that adds it to the
+  story as a work note, and sends the approved **name mappings** to the original report's story. There they're stored
+  on its flow (`approvedMappings`) and given to the report model builder on the next rebuild.
 
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:

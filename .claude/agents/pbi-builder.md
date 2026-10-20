@@ -31,7 +31,24 @@ Rules:
   introduced. The app runs it too, and new errors fail QC.
 - You can't open Desktop, take screenshots or query the DWH. Say in your result what Matt should check visually.
 
-Data first (especially when refactoring a semantic model):
+The model comes from the report model builder:
+- When your brief has a "The model is ready" section, build on that model. Don't change its tables, sources or
+  relationships (report-level measures are fine).
+- If the model is missing something the report needs, or something in it is wrong (a bad relationship, a wrong
+  measure, the wrong grain), don't work around it. Build what you can, then end your result with a `model-requests`
+  block and stop. The app sends it back to the report model builder and runs your pass again on the fixed model:
+
+  ````
+  ```model-requests
+  [
+    {"need": "measure", "what": "[AP Retainage Held] summed per vendor", "why": "Retainage column on the AP aging page"},
+    {"need": "fix", "what": "Fact_AP_Aging -> Dim_Vendor relationship is many-to-many", "why": "vendor slicer double counts"}
+  ]
+  ```
+  ````
+  `need` is one of `measure`, `table`, `column`, `relationship`, `fix`.
+
+Data first (when your brief has no model handoff, or for the report's own needs):
 1. **Inventory before you build.** On your first pass, list every table, column and number the work needs. Then check
    each one against the model's TMDL (what the semantic model has) and the gold catalog named in your brief (what gold
    has). The silver catalog next to it helps with where missing data could come from.

@@ -214,6 +214,19 @@ server.registerTool(
 );
 
 server.registerTool(
+  'start_gap_design',
+  {
+    description:
+      "In a 'Data Gaps for - STRY…' story's chat. Starts dwh-gap-designer (read-only): for each gap it separates name confusion from real gaps and writes text proposals (gold column additions, new gold / silver tables, with sources and why). Nothing is written to the DWH. Its proposal comes back as a card in this chat; approving it adds a work note to the gaps story and sends approved name mappings to the original report. END YOUR TURN after calling it.",
+    inputSchema: {
+      origin_story: z.string().optional().describe('The report story the gaps came from, if the title does not say'),
+      notes: z.string().optional().describe('Anything Matt said to focus on'),
+    },
+  },
+  (args) => call('start_gap_design', args),
+);
+
+server.registerTool(
   'stop_report_work',
   {
     description: "Story chats only. Stops the story's running builder/QC loop (e.g. Matt says wait, or something's wrong). The branch keeps what was committed. No card needed.",

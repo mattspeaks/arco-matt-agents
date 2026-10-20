@@ -104,6 +104,7 @@ const KIND_TITLE: Partial<Record<Approval['kind'], string>> = {
   story_close: 'Close story',
   pbi_gaps: 'Data gaps',
   pbi_proceed: 'Proceed or pause',
+  gap_design: 'Gap design',
 };
 
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
@@ -126,7 +127,7 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
     <div className={`approval ${approval.kind}`}>
       <div className="approval-kind small">{KIND_TITLE[approval.kind] ?? approval.kind}</div>
       <div className="approval-title">{approval.title}</div>
-      {['sn_confirm', 'pbi_start', 'pbi_revise', 'story_close', 'pbi_gaps', 'pbi_proceed'].includes(approval.kind) && p.preview && (
+      {['sn_confirm', 'pbi_start', 'pbi_revise', 'story_close', 'pbi_gaps', 'pbi_proceed', 'gap_design'].includes(approval.kind) && p.preview && (
         <div className="approval-preview md small">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
         </div>
@@ -196,10 +197,10 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
           <input className="input small" placeholder="Note (optional, sent with your decision)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="approval-actions">
             <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
-              {approval.kind === 'pbi_proceed' ? 'Proceed' : 'Approve'}
+              {approval.kind === 'gap_design' ? 'Approve design' : 'Approve'}
             </button>
             <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
-              {approval.kind === 'pbi_proceed' ? 'Pause' : 'Reject'}
+              {approval.kind === 'gap_design' ? 'Not yet' : 'Reject'}
             </button>
           </div>
         </>

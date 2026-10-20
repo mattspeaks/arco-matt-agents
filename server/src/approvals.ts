@@ -10,10 +10,10 @@ import { startWorkerRun } from './workers.js';
 // pbi_*: the Power BI story workflow's cards (pbi/flow.ts). pbi_start, pbi_review and pbi_revise also authorise the
 // lane move and acceptance-criteria update they describe, in the chat turn the click starts.
 // time_entry: hours to add to a story's timesheet row, entered on the card (timesheet.ts).
-export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'pbi_gaps' | 'pbi_proceed' | 'time_entry' | 'story_close';
+export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'pbi_gaps' | 'pbi_proceed' | 'time_entry' | 'story_close' | 'gap_design';
 
 /** Cards whose click starts a chat turn that may write to ServiceNow (see /api/agent/write_permit). */
-export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise', 'time_entry', 'story_close'];
+export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise', 'time_entry', 'story_close', 'gap_design'];
 const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish', 'pbi_gaps', 'pbi_proceed'];
 
 export interface Approval {
@@ -87,6 +87,15 @@ export async function decide(
   const approval = await getApproval(id);
   if (!approval) throw new Error('Approval not found');
   if (approval.status !== 'pending') throw new Error(`Approval already ${approval.status}`);
+
+  if (approval.kind === 'gap_design') {
+    const { decideGapDesign } = await import('./pbi/gapdesign.js');
+    const outcome = await decideGapDesign(approval, approve, note);
+    await query('UPDATE dbo.approvals SET status = ?, decision_note = ?, outcome = ?, decided_at = SYSUTCDATETIME() WHERE id = ?', [approve ? 'approved' : 'rejected', note, outcome, id]);
+    const updated = (await getApproval(id))!;
+    publish('approval', updated);
+    return updated;
+  }
 
   if (approval.kind === 'story_close') {
     const { decideClose } = await import('./closeout.js');

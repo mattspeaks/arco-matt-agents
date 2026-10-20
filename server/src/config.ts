@@ -41,6 +41,8 @@ export interface AppConfig {
   dwh: {
     /** Databases the read-only catalog covers (dwh/catalog.ts); the report model builder greps them. */
     catalogDatabases: string[];
+    /** The local DWH repo (ADO "Data Warehouse"); the gap designer reads its gold SQL, read-only. */
+    repoPath: string;
     /** The Fabric IQ ontology the report model builder reads (dwh/ontology.ts). */
     ontology: { workspaceId: string; name: string };
   };

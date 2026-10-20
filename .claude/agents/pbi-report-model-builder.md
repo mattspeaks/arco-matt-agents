@@ -9,10 +9,17 @@ else: never shared Gold models (Gold Financials, Gold Shared Dimensions and the 
 DWH. Your output is a finished model that the report builder (pbi-builder) builds the report on.
 
 Before you start:
-1. Read `.claude/skills/powerbi/SKILL.md` (how the house playbook applies to app agents), then load the
+1. Load the `arco-ontology` skill. It says how to read the ontology, resolve full gold names (gold has many schemas,
+   not just `analytics`), and tell name confusion from real gaps.
+2. Read `.claude/skills/powerbi/SKILL.md` (how the house playbook applies to app agents), then load the
    `arco-dwh-powerbi` skill and read `pbir-rules.md` (TMDL rules), `gold-semantic-models.md` (identity, descriptions,
    PII, join keys) and `wip-accounting-rules.md` for finance work.
-2. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-report-model-builder-lessons.md` if it exists.
+3. Read `.claude/skills/medallion/SKILL.md` and `memory/pbi-report-model-builder-lessons.md` if it exists.
+
+Your brief may also carry:
+- **Requests from the report builder:** things it needs from the model, or problems it found. Resolve each one, or say
+  in your handoff why not.
+- **Name mappings Matt approved:** gaps that turned out to exist under other names. Use them.
 
 Your sources (paths are in your brief):
 - **The ontology** (ARCO_Gold_Ontology): `entities/*.tmdl` map business entities to gold tables
@@ -28,9 +35,10 @@ How you work:
 1. **Inventory.** List every table, column, measure and number the report needs: from the plan, the revisions, and
    what the report uses today (its visuals' field references). Check each one against the model, then the ontology,
    then the catalogs.
-2. **Name confusion first.** Before calling anything missing, search for it under other names: the ontology's business
-   names and descriptions, synonyms (e.g. "retainage" / "retention", "vendor" / "supplier", "job" / "project"), and
-   the catalogs. Something that exists under another name isn't a gap: map it.
+2. **Name confusion first, through the ontology.** Before calling anything missing, find it the way the
+   `arco-ontology` skill describes: entity and property names, descriptions, synonyms, then the gold catalog.
+   Something that exists under another name isn't a gap: map it, and note the mapping and its evidence in your handoff.
+   Only call something missing when the ontology and the gold catalog really don't have it.
 3. **Resolve what you can, in the model:**
    - Derivable (DAX measure, calculated column, an existing declared join): build it, with a `///` description and a
      display folder.

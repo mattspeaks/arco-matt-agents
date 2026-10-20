@@ -14,6 +14,7 @@ import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
 import { catalogStatus, ensureCatalog } from './dwh/catalog.js';
 import { ensureOntology, ontologyStatus } from './dwh/ontology.js';
+import { startGapDesign } from './pbi/gapdesign.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
@@ -295,6 +296,9 @@ app.post<{ Body: AgentBody }>('/api/agent/start_closeout', async (req) => {
   if (!conv?.story_number) throw bad('start_closeout only works in a story chat');
   return agentCall(() => getChecklist(conv.story_number!).then((c) => c ?? startCloseout(conv.story_number!)));
 });
+app.post<{ Body: AgentBody }>('/api/agent/start_gap_design', async (req) =>
+  agentCall(() => startGapDesign({ parentRunId: req.body.parentRunId, originStory: str(req.body.origin_story), notes: str(req.body.notes) })),
+);
 app.post<{ Body: AgentBody }>('/api/agent/stop_report_work', async (req) => agentCall(() => stopReportWork({ parentRunId: req.body.parentRunId, reason: str(req.body.reason) })));
 
 // Localhost only: this API can drive your browser session and start agents.
