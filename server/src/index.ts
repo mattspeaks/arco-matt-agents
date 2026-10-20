@@ -118,10 +118,10 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
-app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean } }>(
+app.post<{ Params: { id: string }; Body: { approve: boolean; note?: string; workspaceId?: string; reportId?: string; name?: string; hours?: Record<string, number>; weekStart?: string; confirmProduction?: boolean; sprint?: 'current' | 'backlog' } }>(
   '/api/approvals/:id/decision',
   async (req) =>
-    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart, confirmProduction: req.body?.confirmProduction === true }),
+    decide(req.params.id, Boolean(req.body?.approve), req.body?.note, { workspaceId: req.body?.workspaceId, reportId: req.body?.reportId, name: req.body?.name, hours: req.body?.hours, weekStart: req.body?.weekStart, confirmProduction: req.body?.confirmProduction === true, sprint: req.body?.sprint === 'current' ? 'current' : 'backlog' }),
 );
 
 // ---- Power BI report workflow (pbi/flow.ts) -----------------------------------------------------

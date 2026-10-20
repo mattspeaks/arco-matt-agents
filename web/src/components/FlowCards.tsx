@@ -395,3 +395,48 @@ export function TimeEntryCard({ approval, onError }: { approval: Approval; onErr
     </div>
   );
 }
+
+/** The Data gaps card: every gap the builder found, and one story for all of them (current sprint or backlog). */
+export function GapsCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
+  const p = parseJson<Record<string, string>>(approval.payload, {});
+  const { busy, decide } = useDecide(approval, onError);
+  const [sprint, setSprint] = useCardState<'current' | 'backlog'>(approval.id, 'sprint', 'backlog');
+  const [note, setNote] = useCardState(approval.id, 'note', '');
+  return (
+    <div className="approval pbi_gaps">
+      <div className="approval-kind small">Data gaps</div>
+      <div className="approval-title">{approval.title}</div>
+      {p.preview && (
+        <div className="approval-preview md small">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
+        </div>
+      )}
+      {approval.status === 'pending' ? (
+        <>
+          <p className="small muted">
+            One story covers every gap above: <strong>Data Gaps for - {p.storyNumber} - …</strong>. Derivable items aren't in it.
+            {p.blocked ? ' Next, you choose whether to proceed with what can be built or pause.' : ''}
+          </p>
+          <div className="week-switch" role="radiogroup" aria-label="Sprint">
+            {(['current', 'backlog'] as const).map((s) => (
+              <button key={s} role="radio" aria-checked={sprint === s} className={`btn small ${sprint === s ? 'primary' : 'ghost'}`} onClick={() => setSprint(s)}>
+                {s === 'current' ? 'Current sprint' : 'Backlog'}
+              </button>
+            ))}
+          </div>
+          <input className="input small" placeholder="Note for the story (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <div className="approval-actions">
+            <button className="btn primary" disabled={busy} onClick={() => void decide(true, { sprint, note })}>
+              Create data-gaps story
+            </button>
+            <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
+              No story
+            </button>
+          </div>
+        </>
+      ) : (
+        <Decided approval={approval} label={approval.status === 'approved' ? 'Story requested' : 'No story'} />
+      )}
+    </div>
+  );
+}

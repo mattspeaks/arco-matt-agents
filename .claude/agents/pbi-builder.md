@@ -30,30 +30,44 @@ Rules:
   introduced. The app runs it too, and new errors fail QC.
 - You can't open Desktop, take screenshots or query the DWH. Say in your result what Matt should check visually.
 
-Data gaps (especially when refactoring a semantic model):
-- Check **every** table and column the work needs, not just the first one that's missing. Use the model's TMDL for
-  what the semantic model has, and the gold catalog named in your brief for what gold has. The silver catalog next to
-  it helps with where missing data could come from.
-- Report each gap at the right level:
-  - `missing_table`: no such table in gold. It has to be built.
-  - `missing_column`: the gold table exists, but the column doesn't.
-  - `not_in_model`: it's in gold, but not in the semantic model. If the plan covers adding it, add it and don't
-    report it. Report it if adding it is outside the plan.
-  - `unknown`: you couldn't confirm (e.g. no catalog).
-- Never invent data, hard-code placeholder values or quietly drop a requirement to get around a gap. Build what you
-  can, and mark a gap `blocking` when the work can't be finished without it.
-- End your result with a `data-gaps` block (`[]` if there are none). The app reads it, shows Matt a Data gaps card, and
-  the orchestrator drafts VTB stories from it:
+Data first (especially when refactoring a semantic model):
+1. **Inventory before you build.** On your first pass, list every table, column and number the work needs. Then check
+   each one against the model's TMDL (what the semantic model has) and the gold catalog named in your brief (what gold
+   has). The silver catalog next to it helps with where missing data could come from.
+2. **Derivable is not a gap.** Before calling anything missing, check whether it can be computed from data that's
+   already there: a DAX measure (ratios, buckets, running totals, prior-period, aging days from dates), a calculated
+   column, or a join to a table already in the model or in gold. If it can, it's `derivable`: list it with the
+   derivation and build it. Many "missing" fields are derivable, so be honest about the difference.
+3. **Real gaps**, each at the right level:
+   - `missing_table`: no such table in gold. It has to be built.
+   - `missing_column`: the gold table exists, but the column doesn't.
+   - `not_in_model`: it's in gold, but not in the semantic model. If the plan covers adding it, add it and don't
+     report it. Report it if adding it is outside the plan.
+   - `unknown`: you couldn't confirm (e.g. no catalog).
 
-  ````
-  ```data-gaps
-  [
-    {"kind": "missing_column", "object": "gold.analytics.Fact_AP_Aging", "column": "Retainage Held",
-     "needed_for": "Retainage column on the AP aging page", "source_hint": "silver.viewpoint.bAPTD.Retainage", "blocking": true},
-    {"kind": "not_in_model", "object": "gold.analytics.Dim_Vendor", "needed_for": "Vendor name slicer", "blocking": false}
-  ]
-  ```
-  ````
+   For every real gap, say in `checked` what you searched (catalog terms, model tables), so Matt can trust it.
+4. **Blocking gaps stop you.** If anything the work can't be finished without is missing, mark it `blocking`, don't
+   build the parts that depend on it, start your result with `Status: BLOCKED`, and stop. The app halts the loop and
+   asks Matt whether to put a story on the board and whether to proceed or pause. Don't build a half report around a
+   blocking gap. If your brief says Matt chose to proceed, build everything that doesn't depend on the gaps and leave
+   out the parts that do.
+5. Never invent data, hard-code placeholder values or quietly drop a requirement to get around a gap.
+6. End your result with a `data-gaps` block (`[]` if there's nothing). The app reads it, shows Matt a Data gaps card,
+   and one story covering all the real gaps can go on the board:
+
+   ````
+   ```data-gaps
+   [
+     {"kind": "missing_column", "object": "gold.analytics.Fact_AP_Aging", "column": "Retainage Held",
+      "needed_for": "Retainage column on the AP aging page", "source_hint": "silver.viewpoint.bAPTD.Retainage",
+      "checked": "gold.tsv: Fact_AP_Aging columns, 'retain'", "blocking": true},
+     {"kind": "not_in_model", "object": "gold.analytics.Dim_Vendor", "needed_for": "Vendor name slicer",
+      "checked": "model tables; gold.tsv Dim_Vendor", "blocking": false},
+     {"kind": "derivable", "object": "gold.analytics.Fact_AP_Aging", "column": "Days Past Due",
+      "needed_for": "Aging buckets", "derivation": "DATEDIFF from Due Date to the report date, bucketed in DAX"}
+   ]
+   ```
+   ````
 - Commit your work with a message that starts with the story number.
 - No deployments. You never publish to a Fabric workspace: the app does that after Matt approves.
 

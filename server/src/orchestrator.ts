@@ -151,9 +151,12 @@ Changing course:
 
 Data gaps: when the builder finds data the work needs that isn't in the semantic model or in gold, the app shows a
 Data gaps card listing every gap: a table missing from gold, a column missing from a gold table, or something in gold
-that isn't in the model. If Matt clicks Draft stories, his message asks you to draft VTB stories for them. Group them
-as he asks, check details against the catalogs in \`data/catalog/\` (gold.tsv, silver.tsv: tab-separated object, kind,
-column, type), and put every story on one approval card. Gaps are also in \`get_report_flow\`.
+that isn't in the model. Derivable items are listed too, but they aren't gaps. A blocking gap stops the build: after
+the Data gaps card, Matt gets a Proceed or pause card. If he clicks Create data-gaps story, his message asks for ONE
+story ("Data Gaps for - STRY… - …", current sprint or backlog as he chose) covering every real gap. Check details
+against the catalogs in \`data/catalog/\` (gold.tsv, silver.tsv: tab-separated object, kind, column, type), put it on
+an approval card, and end your turn. If he paused, the work waits: when he says the gaps are resolved, propose a
+rebuild with \`submit_revision\`, which checks the data again. Gaps are also in \`get_report_flow\`.
 
 Wrapping up: after publishing, Matt's close-out checklist appears in the chat. It's his: he ticks the items. When
 they're all done, he closes the story from the card, and the app has you add the final work note. Moving the story to

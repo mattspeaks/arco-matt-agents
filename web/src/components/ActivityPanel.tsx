@@ -2,7 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fmtDuration, fmtTime, parseJson } from '../api';
 import type { Approval, Run } from '../types';
-import { PublishCard, ReviewCard, TimeEntryCard, useDecide } from './FlowCards';
+import { GapsCard, PublishCard, ReviewCard, TimeEntryCard, useDecide } from './FlowCards';
 import { useCardState } from '../cardState';
 
 const KIND_LABEL: Record<Run['kind'], string> = { sync: 'Sync', orchestrator: 'Chat', worker: 'Worker', sn_write: 'SN write' };
@@ -103,12 +103,14 @@ const KIND_TITLE: Partial<Record<Approval['kind'], string>> = {
   pbi_revise: 'Revise report',
   story_close: 'Close story',
   pbi_gaps: 'Data gaps',
+  pbi_proceed: 'Proceed or pause',
 };
 
 export function ApprovalCard({ approval, onError }: { approval: Approval; onError: (m: string) => void }) {
   if (approval.kind === 'pbi_review') return <ReviewCard approval={approval} onError={onError} />;
   if (approval.kind === 'pbi_publish') return <PublishCard approval={approval} onError={onError} />;
   if (approval.kind === 'time_entry') return <TimeEntryCard approval={approval} onError={onError} />;
+  if (approval.kind === 'pbi_gaps') return <GapsCard approval={approval} onError={onError} />;
   return <BasicApprovalCard approval={approval} onError={onError} />;
 }
 
@@ -123,7 +125,7 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
     <div className={`approval ${approval.kind}`}>
       <div className="approval-kind small">{KIND_TITLE[approval.kind] ?? approval.kind}</div>
       <div className="approval-title">{approval.title}</div>
-      {['sn_confirm', 'pbi_start', 'pbi_revise', 'story_close', 'pbi_gaps'].includes(approval.kind) && p.preview && (
+      {['sn_confirm', 'pbi_start', 'pbi_revise', 'story_close', 'pbi_gaps', 'pbi_proceed'].includes(approval.kind) && p.preview && (
         <div className="approval-preview md small">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{p.preview}</ReactMarkdown>
         </div>
@@ -193,10 +195,10 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
           <input className="input small" placeholder="Note (optional, sent with your decision)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="approval-actions">
             <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
-              {approval.kind === 'pbi_gaps' ? 'Draft stories' : 'Approve'}
+              {approval.kind === 'pbi_proceed' ? 'Proceed' : 'Approve'}
             </button>
             <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
-              {approval.kind === 'pbi_gaps' ? 'Not now' : 'Reject'}
+              {approval.kind === 'pbi_proceed' ? 'Pause' : 'Reject'}
             </button>
           </div>
         </>

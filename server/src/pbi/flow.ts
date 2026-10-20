@@ -25,7 +25,8 @@ import { changedFiles, commitAll, diffStat, ensureWorktree, filesAt, freshBase, 
 // ServiceNow changes happen only in story-chat turns started by Matt's clicks; the app never touches ServiceNow.
 
 // final_qc: Matt approved the review; pbi-qc checks exactly what will be published before the Publish card.
-export type Stage = 'pulling' | 'building' | 'idle' | 'review' | 'revising' | 'final_qc' | 'publishing' | 'published' | 'failed';
+// gaps: the builder stopped on blocking data gaps; waiting for Matt (story? then proceed or pause).
+export type Stage = 'pulling' | 'building' | 'gaps' | 'idle' | 'review' | 'revising' | 'final_qc' | 'publishing' | 'published' | 'failed';
 const ACTIVE: Stage[] = ['pulling', 'building', 'final_qc', 'publishing'];
 
 export interface FlowData {
@@ -58,8 +59,12 @@ export interface FlowData {
   activeRunId?: string;
   lastBuilder?: string;
   lastQc?: { verdict?: string; result: string };
-  /** Data the work needs that isn't in the semantic model or in gold, as reported by the builder (all rounds). */
+  /** Data the work needs that isn't in the semantic model or in gold, as reported by the builder this round. */
   gaps?: DataGap[];
+  /** Matt chose to build what's possible despite blocking gaps (Proceed on the Proceed-or-pause card). */
+  proceedDespiteGaps?: boolean;
+  /** Matt paused the work until the gaps are resolved; the next rebuild checks again. */
+  pausedForGaps?: boolean;
   /** The house linter on the last build: new errors / warnings vs the starting point. */
   lastLint?: { ran: boolean; newErrors: number; newWarnings: number; preexisting: number };
   /** Head when the Review card went up: later commits are Matt's own edits in Desktop. */
@@ -78,9 +83,11 @@ export interface FlowData {
  * - missing_column: the gold table exists but lacks the column
  * - not_in_model: it's in gold, but not in the semantic model (the model needs the table / column added)
  * - unknown: the builder couldn't tell (e.g. no catalog)
+ * - derivable: NOT a gap. It can be computed from data already there (DAX, calculated column, existing join); listed so
+ *   Matt sees how, and never put in a story
  */
 export interface DataGap {
-  kind: 'missing_table' | 'missing_column' | 'not_in_model' | 'unknown';
+  kind: 'missing_table' | 'missing_column' | 'not_in_model' | 'unknown' | 'derivable';
   /** gold.schema.table (the one that's missing, or the one lacking the column) */
   object: string;
   column?: string;
@@ -90,10 +97,17 @@ export interface DataGap {
   sourceHint?: string;
   /** The work can't be finished without it */
   blocking?: boolean;
+  /** What the builder searched to conclude it's missing (catalog terms, model tables) */
+  checked?: string;
+  /** For derivable: how it will be computed */
+  derivation?: string;
   notes?: string;
 }
 
-const GAP_KINDS = ['missing_table', 'missing_column', 'not_in_model', 'unknown'];
+const realGaps = (gaps: DataGap[] = []) => gaps.filter((g) => g.kind !== 'derivable');
+const blockingGaps = (gaps: DataGap[] = []) => realGaps(gaps).filter((g) => g.blocking);
+
+const GAP_KINDS = ['missing_table', 'missing_column', 'not_in_model', 'unknown', 'derivable'];
 
 /** The builder's ```data-gaps JSON block, validated. Missing or malformed = none reported. */
 export function parseGaps(result: string): DataGap[] {
@@ -110,7 +124,9 @@ export function parseGaps(result: string): DataGap[] {
         column: typeof g.column === 'string' && g.column.trim() ? g.column.trim() : undefined,
         neededFor: String(g.needed_for ?? g.neededFor ?? '').trim().slice(0, 300),
         sourceHint: typeof (g.source_hint ?? g.sourceHint) === 'string' ? String(g.source_hint ?? g.sourceHint).trim().slice(0, 200) || undefined : undefined,
-        blocking: Boolean(g.blocking),
+        blocking: g.kind !== 'derivable' && Boolean(g.blocking),
+        checked: typeof g.checked === 'string' ? g.checked.trim().slice(0, 300) || undefined : undefined,
+        derivation: typeof g.derivation === 'string' ? g.derivation.trim().slice(0, 300) || undefined : undefined,
         notes: typeof g.notes === 'string' ? g.notes.trim().slice(0, 300) || undefined : undefined,
       }));
   } catch {
@@ -560,6 +576,8 @@ type CardPayload = Record<string, string> & { conversationId: string; storyNumbe
 
 /** Called by approvals.decide before the card is marked. Throwing leaves the card pending. Returns the outcome text. */
 export interface PublishChoice {
+  /** Data gaps card: put the story in the current sprint or the backlog. */
+  sprint?: 'current' | 'backlog';
   workspaceId?: string;
   /** Existing report to update; empty = create a new one. */
   reportId?: string;
@@ -639,7 +657,15 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
       `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress if it isn't already${p.acceptanceCriteria ? ', add the new acceptance criteria from the card' : ''}, then resync. The app is running the builder/QC loop with these changes.`,
       { answersApprovalId: approval.id },
     );
-    const data: FlowData = { ...flow.data, round: flow.data.round + 1, revisions: [...flow.data.revisions, p.changes], permitApprovalId: approval.id, error: undefined };
+    const data: FlowData = {
+      ...flow.data,
+      round: flow.data.round + 1,
+      revisions: [...flow.data.revisions, p.changes],
+      permitApprovalId: approval.id,
+      error: undefined,
+      // After a pause for data gaps, the rebuild checks the data again (and stops again if they're still missing).
+      ...(flow.data.pausedForGaps ? { pausedForGaps: false, proceedDespiteGaps: false } : {}),
+    };
     await supersedeFlowCards(story);
     await saveFlow(story, data.worktree ? 'building' : 'pulling', data);
     void pipeline(story, approval.id, async () => {
@@ -650,19 +676,45 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
   }
 
   if (approval.kind === 'pbi_gaps') {
-    if (!approve) return 'Not now';
-    const gaps = JSON.parse(p.gaps || '[]') as DataGap[];
+    // Either way, a stop on blocking gaps then asks: proceed with what's possible, or pause?
+    const next = async () => {
+      if (p.blocked) await raiseProceedCard(story, flow.data);
+    };
+    if (!approve) {
+      await next();
+      return 'No story';
+    }
+    const gaps = realGaps(JSON.parse(p.gaps || '[]') as DataGap[]);
+    const desc = (await queryOne<{ d: string | null }>('SELECT short_description AS d FROM dbo.stories WHERE number = ?', [story]))?.d ?? flow.data.reportName;
+    const title = `Data Gaps for - ${story} - ${desc}`.slice(0, 160);
+    const sprint = extra.sprint === 'current' ? 'in the current sprint' : 'in the backlog (no sprint)';
     await sendMessage(
       p.conversationId,
       [
-        `Draft new VTB stories for the data the ${story} work found missing${note ? ` (${note})` : ''}:`,
+        `Create one VTB story for the data the ${story} work found missing, ${sprint}${note ? ` (${note})` : ''}.`,
+        `Title: "${title}"`,
         '',
         gapsMarkdown(gaps),
         '',
-        `Group them sensibly: one DWH story per new gold table, missing columns on the same gold table together, and the semantic-model additions as one Power BI story. Follow the servicenow skill's creating recipe: each story says what's needed, why (${story}), where the data likely comes from, and acceptance criteria listing the tables and columns. Tag DWH work #DWH (#NewTable for a new table) and model work #SemanticModel, and mention ${story} in each description. Put them all on one approval card and end your turn.`,
+        `Follow the servicenow skill's creating recipe. One story, not one per gap. The description lists every gap above grouped as shown, with what needs it (${story}) and where the data likely comes from; acceptance criteria list each table, column and model addition. Tag it #DWH (and #SemanticModel if it includes model additions). Put it on an approval card and end your turn.`,
       ].join('\n'),
     );
-    return 'Approved: the orchestrator is drafting the stories';
+    await next();
+    return `Approved: drafting "${title}" ${sprint}`;
+  }
+
+  if (approval.kind === 'pbi_proceed') {
+    if (approve) {
+      assertNotActive(story, flow);
+      const data: FlowData = { ...flow.data, proceedDespiteGaps: true, pausedForGaps: false, error: undefined };
+      await saveFlow(story, 'building', data);
+      await postAppNote(p.conversationId, `Proceeding: the builder will build everything that doesn't depend on the data gaps and leave out the parts that do, then QC and a Review card as usual.`);
+      void pipeline(story, approval.id, () => buildLoop(story));
+      return 'Proceeding with what is possible';
+    }
+    await saveFlow(story, 'idle', { ...flow.data, pausedForGaps: true, proceedDespiteGaps: false });
+    await postAppNote(p.conversationId, `Paused until the data gaps are resolved. When they are, ask the orchestrator here to rebuild; it'll check the data again first.`);
+    return 'Paused for data gaps';
   }
 
   if (approval.kind === 'pbi_publish') {
@@ -813,6 +865,22 @@ async function buildLoop(story: string) {
     gaps = mergeGaps(gaps, parseGaps(builder));
     await commitAll(wt, `${story}: builder pass ${pass} (changes the builder left uncommitted)`);
 
+    // Blocking gaps stop the loop before QC and further passes: no half-built report, no Review card. Matt decides
+    // on the Data gaps card (a story?) and then on Proceed or pause.
+    const blocking = blockingGaps(gaps);
+    if (blocking.length && !data.proceedDespiteGaps) {
+      const cur = await getFlow(story);
+      if (cur?.stage !== 'building') return;
+      const next: FlowData = { ...cur.data, gaps, lastBuilder: builder };
+      await saveFlow(story, 'gaps', next);
+      await postAppNote(
+        data.conversationId,
+        `**Stopped:** the builder found ${blocking.length} blocking data gap${blocking.length === 1 ? '' : 's'}, so it didn't build the parts that need ${blocking.length === 1 ? 'it' : 'them'} and QC didn't run. Decide on the Data gaps card below, then choose whether to proceed with what's possible or pause.`,
+      );
+      await raiseGapsCard(story, next, gaps, true);
+      return;
+    }
+
     const files = await changedFiles(wt, base);
     const stat = await diffStat(wt, base);
     lint = await lintBranch({ worktree: wt, reportRel: data.reportDir, baseSha: base });
@@ -831,10 +899,10 @@ async function buildLoop(story: string) {
 
   const current = await getFlow(story);
   if (current?.stage !== 'building') return;
-  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint), gaps: mergeGaps(current.data.gaps, gaps) };
+  const next: FlowData = { ...current.data, lastBuilder: builder, lastQc: qc, lastLint: lint && lintCounts(lint), gaps };
   await saveFlow(story, 'review', next);
-  // Missing data comes first, so it's in front of Matt before he reviews what the builder could do without it.
-  if (gaps.length) await raiseGapsCard(story, next, gaps);
+  // Non-blocking gaps: offered as a story, ahead of the Review card. (Already offered when the loop stopped on them.)
+  if (realGaps(gaps).length && !current.data.proceedDespiteGaps) await raiseGapsCard(story, next, gaps, false);
   await raiseReviewCard(story, next, qc);
 }
 
@@ -862,6 +930,7 @@ function builderBrief(story: string, d: FlowData, pass: number, findings?: strin
     `## Plan (approved by Matt)\n${d.plan}`,
     d.revisions.length && `## Revisions Matt asked for\n${d.revisions.map((r, i) => `### Round ${i + 2}\n${r}`).join('\n\n')}`,
     findings && `## QC findings to fix\n${findings}`,
+    d.proceedDespiteGaps && d.gaps?.length && `## Matt chose to proceed despite these data gaps\n${gapsMarkdown(d.gaps)}\n\nBuild everything that doesn't depend on them. Leave out the parts that do (no placeholder or invented data) and list them under Open questions. Still end with a data-gaps block.`,
     [
       '## Where',
       `- Git worktree: ${wt}. It's already on branch \`${d.branch}\`; stay on it (don't create or switch branches).`,
@@ -1209,10 +1278,11 @@ const GAP_LABEL: Record<DataGap['kind'], string> = {
   missing_column: 'Column missing from a gold table',
   not_in_model: 'In gold, not in the semantic model',
   unknown: "Couldn't confirm",
+  derivable: 'Derivable from existing data (not a gap, no story)',
 };
 
 export function gapsMarkdown(gaps: DataGap[]): string {
-  const order: DataGap['kind'][] = ['missing_table', 'missing_column', 'not_in_model', 'unknown'];
+  const order: DataGap['kind'][] = ['missing_table', 'missing_column', 'not_in_model', 'unknown', 'derivable'];
   return order
     .filter((k) => gaps.some((g) => g.kind === k))
     .map((k) =>
@@ -1220,18 +1290,42 @@ export function gapsMarkdown(gaps: DataGap[]): string {
         `**${GAP_LABEL[k]}**`,
         ...gaps
           .filter((g) => g.kind === k)
-          .map((g) => `- \`${g.object}${g.column ? `.${g.column}` : ''}\`${g.blocking ? ' (blocking)' : ''}: ${g.neededFor || 'needed by the work'}${g.sourceHint ? `. Source: ${g.sourceHint}` : ''}${g.notes ? `. ${g.notes}` : ''}`),
+          .map((g) => `- \`${g.object}${g.column ? `.${g.column}` : ''}\`${g.blocking ? ' (blocking)' : ''}: ${g.neededFor || 'needed by the work'}${g.derivation ? `. Derive: ${g.derivation}` : ''}${g.sourceHint ? `. Source: ${g.sourceHint}` : ''}${g.checked ? `. Checked: ${g.checked}` : ''}${g.notes ? `. ${g.notes}` : ''}`),
       ].join('\n'),
     )
     .join('\n\n');
 }
 
 /** The Data gaps card: everything the builder found missing, and a button that asks the orchestrator to draft stories. */
-async function raiseGapsCard(story: string, d: FlowData, gaps: DataGap[]) {
+async function raiseGapsCard(story: string, d: FlowData, gaps: DataGap[], blocked: boolean) {
+  const real = realGaps(gaps);
+  const derivable = gaps.length - real.length;
+  const nBlocking = blockingGaps(gaps).length;
   const card = await createApproval({
     kind: 'pbi_gaps',
-    title: `${story}: ${gaps.length} data gap${gaps.length === 1 ? '' : 's'} found${gaps.some((g) => g.blocking) ? ' (some blocking)' : ''}`,
-    payload: { conversationId: d.conversationId, storyNumber: story, gaps: JSON.stringify(gaps), preview: gapsMarkdown(gaps) },
+    title: `${story}: ${real.length} data gap${real.length === 1 ? '' : 's'}${nBlocking ? ` (${nBlocking} blocking)` : ''}${derivable ? `, ${derivable} derivable` : ''}`,
+    payload: { conversationId: d.conversationId, storyNumber: story, gaps: JSON.stringify(gaps), preview: gapsMarkdown(gaps), blocked: blocked ? '1' : '' },
+    requestedByRunId: null,
+  });
+  await postApprovalCard(d.conversationId, card.id);
+}
+
+/** After a stop on blocking gaps (and the gaps story decision): build what's possible now, or wait for the data? */
+async function raiseProceedCard(story: string, d: FlowData) {
+  const blocking = blockingGaps(d.gaps);
+  const card = await createApproval({
+    kind: 'pbi_proceed',
+    title: `${story}: proceed without ${blocking.length} blocking data gap${blocking.length === 1 ? '' : 's'}, or pause?`,
+    payload: {
+      conversationId: d.conversationId,
+      storyNumber: story,
+      preview: [
+        `The builder stopped because ${blocking.length === 1 ? 'this is' : 'these are'} missing:`,
+        gapsMarkdown(blocking),
+        "**Proceed:** build everything that doesn't depend on the gaps (no placeholder data; the parts that need them are left out and listed), then QC and a Review card as usual.",
+        "**Pause:** nothing more is built. When the gaps are resolved, ask the orchestrator here to rebuild; it checks the data again first.",
+      ].join('\n\n'),
+    },
     requestedByRunId: null,
   });
   await postApprovalCard(d.conversationId, card.id);

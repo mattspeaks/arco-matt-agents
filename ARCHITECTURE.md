@@ -332,13 +332,18 @@ rebuild card.
   - `unknown`: couldn't confirm.
 
   Each gap carries what needs it, a source hint (often from the silver catalog) and whether it's blocking.
-- **The app collects gaps across passes and rounds,** and when the loop ends shows a **Data gaps** card ahead of the
-  Review card. **Draft stories** starts a chat turn (Matt's click) asking the orchestrator to draft VTB stories:
-  - one DWH story per new gold table;
-  - missing columns on the same table together;
-  - the model additions as one Power BI story.
-
-  They go on one approval card, so nothing is created until Matt approves it.
+- **Derivable isn't a gap.** Anything computable from existing data (DAX, a calculated column, an existing join) is
+  listed as `derivable`, with its derivation, and built. It never goes in a story and never blocks. Every real gap
+  says what was searched (`checked`).
+- **Blocking gaps stop the loop.** The builder takes its data inventory first, and if a blocking gap exists it doesn't
+  build the dependent parts. The app halts right after that builder pass: no QC, no further passes, no Review card
+  (stage `gaps`). Then:
+  1. The **Data gaps** card offers **one** story, "Data Gaps for - STRY… - &lt;short description&gt;", covering every real
+     gap, in the **current sprint or the backlog**. **Create** starts the orchestrator turn that drafts it onto an
+     approval card.
+  2. Then the **Proceed or pause** card. **Proceed** builds everything that doesn't depend on the gaps, then QC and
+     Review as usual. **Pause** leaves the flow idle; the next rebuild checks the data again.
+- **Non-blocking gaps don't stop the build.** The Data gaps card still offers the story, ahead of the Review card.
 
 ### 5.4 Close-out (`server/src/closeout.ts`, `dbo.story_checklists`)
 Publishing isn't the end of a story. Matt's rollout steps are, and the app keeps track of them:
