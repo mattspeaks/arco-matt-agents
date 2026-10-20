@@ -7,8 +7,8 @@ import { initDb, query } from './db/index.js';
 import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
 import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestPublish, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
-import { archiveConversation, createConversation, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
-import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, waitForRun, withoutBodies, type Run } from './runs.js';
+import { archiveConversation, createConversation, endDeadTurn, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
+import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, updateRun, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getSprintScore, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
 import { askTimeEntry } from './timesheet.js';
@@ -19,7 +19,11 @@ import { startGapDesign } from './pbi/gapdesign.js';
 import { addItem, closeoutSummary, getChecklist, removeItem, requestClose, setItem, startCloseout } from './closeout.js';
 
 await initDb();
-await recoverInterruptedRuns();
+// A restart kills any turn in progress: say so in its chat, so it doesn't look like it's still working.
+for (const r of await recoverInterruptedRuns()) {
+  if (r.conversation_id && (r.kind === 'orchestrator' || r.kind === 'sync'))
+    await endDeadTurn(r.conversation_id, r.id, 'Interrupted: the app restarted before this reply finished. Send your message again.').catch(() => undefined);
+}
 await recoverInterruptedFlows();
 
 const app = Fastify({ logger: { level: 'warn' } });
@@ -85,7 +89,16 @@ app.get<{ Params: { id: string } }>('/api/runs/:id', async (req) => {
   return { run, events: await listRunEvents(run.id) };
 });
 
-app.post<{ Params: { id: string } }>('/api/runs/:id/cancel', async (req) => ({ cancelled: cancelClaudeRun(req.params.id) }));
+// Stop. If the run has no live process any more (e.g. the server restarted mid-turn), end it anyway so the chat
+// stops showing "working".
+app.post<{ Params: { id: string } }>('/api/runs/:id/cancel', async (req) => {
+  if (cancelClaudeRun(req.params.id)) return { cancelled: true };
+  const run = await getRun(req.params.id);
+  if (!run) throw bad('Run not found', 404);
+  if (run.status === 'running' || run.status === 'queued') await updateRun(run.id, { status: 'cancelled', error: 'Stopped by Matt (no live process)', ended: true });
+  const cleared = run.conversation_id ? await endDeadTurn(run.conversation_id, run.id, 'Stopped. This turn had no live process any more (the app had restarted), so nothing was running.') : false;
+  return { cancelled: false, cleared };
+});
 
 app.get('/api/conversations', async () => listConversations());
 app.post<{ Body: { title?: string } }>('/api/conversations', async (req) => createConversation(req.body?.title));

@@ -125,9 +125,11 @@ export async function flushEvents(runId: string): Promise<void> {
 }
 
 /** Runs left "running" by a previous server process can never finish; mark them failed on boot. */
-export async function recoverInterruptedRuns(): Promise<void> {
-  await query(
+/** Runs a previous server process left running can't resume: mark them failed and return them (to tell their chats). */
+export async function recoverInterruptedRuns(): Promise<{ id: string; kind: string; conversation_id: string | null }[]> {
+  return query<{ id: string; kind: string; conversation_id: string | null }>(
     `UPDATE dbo.runs SET status = 'failed', error = 'Interrupted: server restarted', ended_at = SYSUTCDATETIME()
+     OUTPUT inserted.id, inserted.kind, inserted.conversation_id
      WHERE status IN ('running', 'queued')`,
   );
 }

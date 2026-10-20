@@ -231,10 +231,14 @@ async function saveFlow(storyNumber: string, stage: Stage, data: FlowData) {
 
 /** Flows a previous server process left mid-step can't resume; mark them failed so the chat can rerun them. */
 export async function recoverInterruptedFlows() {
-  const rows = await query<FlowRow>(`SELECT * FROM dbo.story_flows WHERE stage IN ('pulling', 'building', 'final_qc', 'publishing')`);
+  const rows = await query<FlowRow>(`SELECT * FROM dbo.story_flows WHERE stage IN (${ACTIVE.map((s) => `'${s}'`).join(', ')})`);
   for (const row of rows) {
     const data = JSON.parse(row.data) as FlowData;
     await saveFlow(row.story_number, 'failed', { ...data, activeRunId: undefined, error: `Interrupted while ${row.stage}: server restarted` });
+    await postAppNote(
+      data.conversationId,
+      `**Interrupted:** the app restarted while this report was ${row.stage}, so that step stopped. Nothing was pushed or published. Ask the orchestrator here to rebuild (or retry the step) when you're ready.`,
+    ).catch(() => undefined);
   }
 }
 

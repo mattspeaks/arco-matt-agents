@@ -76,6 +76,22 @@ export async function listConversations() {
   return rows.map((c) => ({ ...c, busy_run_id: busy.get(c.id), closeout: c.story_number ? progress.get(c.story_number) : undefined }));
 }
 
+/**
+ * Ends a chat turn that has no live process any more (the server restarted mid-turn, or it died): a visible message
+ * tied to the run clears the chat's "working" state. No-op if the turn already has a reply.
+ */
+export async function endDeadTurn(conversationId: string, runId: string, text: string) {
+  const replied = await queryOne<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM dbo.chat_messages WHERE run_id = ? AND role <> 'user'`,
+    [runId],
+  );
+  if (replied?.n) return false;
+  if (busy.get(conversationId) === runId) busy.delete(conversationId);
+  await addMessage(conversationId, 'error', text, runId);
+  publish('conversation', await getConversation(conversationId));
+  return true;
+}
+
 /** Archive or reopen a chat. Nothing is deleted. */
 export async function archiveConversation(id: string, archived: boolean) {
   await query(`UPDATE dbo.conversations SET archived_at = ${archived ? 'SYSUTCDATETIME()' : 'NULL'} WHERE id = ?`, [id]);
