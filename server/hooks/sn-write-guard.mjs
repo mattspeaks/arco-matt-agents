@@ -58,10 +58,29 @@ process.stdin.on('end', () => {
   if (creatingStory && (writes.includes('PATCH') || /\/api\/now\/table\/rm_story\//.test(code))) block('create stories in their own call, separate from updates to existing stories');
   const laneSet = creatingStory ? createStates : allowedStates;
 
-  const states = [...code.matchAll(/['"]?\bstate['"]?\s*:\s*['"`]?(-?\d+)/g)].map((m) => m[1]);
-  if (tables.has('time_card') && /['"]?\bstate['"]?\s*:/.test(code)) block("a time card's state is never changed (Matt submits)");
+  // Reading a result back (`state: r.state` in the summary a script returns) isn't a write. It's exempt only when it
+  // reads from a ServiceNow response (a variable assigned from `await SN(` or a .map callback parameter) and sits
+  // outside every JSON.stringify(...) request body. Anything else that says `state:` is checked as a write.
+  const responseVars = new Set([
+    ...[...code.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*await\s+SN\s*\(/g)].map((m) => m[1]),
+    ...[...code.matchAll(/\.map\s*\(\s*\(?\s*(\w+)/g)].map((m) => m[1]),
+  ]);
+  const bodies = [];
+  for (const m of code.matchAll(/JSON\.stringify\s*\(/g)) {
+    let depth = 1;
+    let i = m.index + m[0].length;
+    while (i < code.length && depth) depth += code[i] === '(' ? 1 : code[i] === ')' ? -1 : 0, i++;
+    bodies.push([m.index, i]);
+  }
+  const inBody = (at) => bodies.some(([a, b]) => at >= a && at < b);
+  const checked = code.replace(/(['"]?\bstate['"]?\s*:\s*)(\w+)\s*(\?\.|\.)\s*state\b/g, (all, key, v, _dot, at) =>
+    responseVars.has(v) && !inBody(at) ? 'readback' : all,
+  );
+
+  const states = [...checked.matchAll(/['"]?\bstate['"]?\s*:\s*['"`]?(-?\d+)/g)].map((m) => m[1]);
+  if (tables.has('time_card') && /['"]?\bstate['"]?\s*:/.test(checked)) block("a time card's state is never changed (Matt submits)");
   for (const s of states) if (!laneSet.has(s)) block(creatingStory ? `a new story may only start in states ${[...createStates].join(', ')}` : `story state ${s} is Matt's lane; agents may only set ${[...allowedStates].join(', ')}`);
-  if (tables.has('rm_story') && /['"]?\bstate['"]?\s*:\s*[^'"`\-\d\s]/.test(code)) block('write story state as a literal value so it can be checked');
+  if (tables.has('rm_story') && /['"]?\bstate['"]?\s*:\s*[^'"`\-\d\s]/.test(checked)) block('write story state as a literal value so it can be checked');
 
   // Writes only happen in the turn Matt started by clicking Approve on the card (request_approval).
   const api = process.env.ARCO_API ?? 'http://127.0.0.1:4317';
