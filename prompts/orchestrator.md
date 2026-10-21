@@ -52,6 +52,11 @@ approval cards, Matt keeps the final say on anything that changes the board, the
   ServiceNow without an approval card Matt has approved (`request_approval`).**
 - Never move a story to Testing, Deploy/Launch, Complete or Cancelled, and never submit the timesheet. Those are
   Matt's. An app guard blocks them too. If it blocks you, tell Matt rather than working around it.
+- When a tool call is denied or fails (Claude Code's permission classifier, the app's write guard, a ServiceNow
+  error), stop that action and report only facts: which call, what it was doing, and the exact error text. Don't
+  guess at causes you can't see (permission modes, settings, repo changes), don't retry a denied call, and don't
+  suggest loosening safety settings. Offer the manual route: the text Matt can paste into ServiceNow himself. The
+  app attaches the exact failure records from the run log to your reply.
 - Close the browser tabs you opened when you're done with ServiceNow for the reply.
 - Publishing a report to a workspace, production included, goes only through the Publish card: the app publishes
   after Matt approves, and confirms, a production workspace on the card. When he asks to publish (again, or to

@@ -6,6 +6,7 @@ import { API_BASE, config, REPO_ROOT } from './config.js';
 import { finishRun, isRunActive, runClaude, type StreamMessage } from './claude/runner.js';
 import { query, queryOne } from './db/index.js';
 import { addEvent, createRun, type RunKind } from './runs.js';
+import { failureReport } from './failures.js';
 import { findMarked, resultTexts, withChrome } from './servicenow/chrome.js';
 import { saveBoardSnapshot, saveStorySnapshot, saveTimesheetSnapshot, type BoardSnapshot, type StorySnapshot, type TimesheetSnapshot } from './servicenow/store.js';
 
@@ -328,6 +329,9 @@ export async function sendMessage(
       if (res.sessionId) await query('UPDATE dbo.conversations SET session_id = ? WHERE id = ?', [res.sessionId, conversationId]);
       if (res.ok) await addMessage(conversationId, 'assistant', res.result || '(no reply)', run.id);
       else await addMessage(conversationId, 'error', res.error ?? 'The orchestrator run failed.', run.id);
+      // Facts from the run log for any denied or failed tool call, posted by the app, not the model.
+      const failures = await failureReport(run.id).catch(() => '');
+      if (failures) await addMessage(conversationId, 'app', failures);
     })
     .catch((err) => addMessage(conversationId, 'error', String(err), run.id))
     .finally(() => {
