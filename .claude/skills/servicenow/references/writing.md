@@ -5,6 +5,8 @@ Every write: resolve → preview → Matt's explicit "yes" → re-check → writ
 - Preview with `mcp__arco__request_approval` (title + markdown preview), then end your turn. Never ask for a yes in
   text. Write only in the turn started by Matt clicking Approve ("Yes, go ahead: …"); the app's guard blocks writes in
   any other turn. One card can cover a batch that was previewed together. If anything changes, preview again.
+- Edited fields and work notes follow "What goes in story text" in SKILL.md: link the source record, no personal
+  data, no pasted SQL or scripts.
 - After writing, compare what ServiceNow returns with what you intended (business rules can override fields
   silently), report anything that didn't take, then re-run the matching snapshot from reading.md.
 

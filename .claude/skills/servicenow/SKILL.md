@@ -76,6 +76,30 @@ window.SN = async (path, opts = {}) => {
 - If API calls start failing with 401/403, tell Matt. Don't switch to clicking through the UI unless he asks.
 - When you're done with ServiceNow for this reply, **close the tabs you opened** with `tabs_close_mcp`.
 
+## What goes in story text (creates, edits, work notes)
+Stories are read by the whole team and outlive the request, so write them lean: what to build and how we'll know
+it's done. Link the source record for the details, and don't copy the details in. This keeps personal and
+sensitive data in the systems built to hold it, and keeps the writes plain enough that nothing in them looks risky.
+
+- **Link, don't copy.** When the work comes from a RITM, incident or document, name it and link it
+  ("Requirements, source SQL and sample: [RITM0052659](https://arcoconstruction.service-now.com/sc_req_item.do?sysparm_query=number=RITM0052659)").
+  Attachments stay on the RITM.
+- **No personal data:** no names of requesters, employees or other people in the text (the `assigned_to` field
+  and the RITM link cover who); no emails, phone numbers, employee IDs, addresses, dates of birth; no pay,
+  salary, rate or amount values for individuals.
+- **Describe data by field, not by value.** "Hours and earn code by employee and job" is fine. Actual names,
+  amounts and row values aren't.
+- **No secrets or access details:** no passwords, tokens, connection strings or keys.
+- **No code that changes systems.** Don't paste SQL or scripts into a story. If the source SQL contains UPDATE,
+  DELETE or similar statements, don't quote or describe them; at most say "the source SQL is read-only reporting
+  for this story" when it matters.
+- **Delivery to people stays generic.** "Each recipient sees only their own rows" is fine. Who receives what, by
+  name or address, belongs in the RITM.
+- **Draft it that way from the start**, and show exactly that text on the approval card. If Matt's notes include
+  any of the above, leave it out of the draft and say what you left out and why in one line of the preview.
+- If a write is still refused, report the facts (the app attaches the run-log record) and offer the manual route.
+  Don't reword to get it through. Ask Matt what to change.
+
 ## What to read next
 - Questions about the board, a story, or hours, or refreshing the app's copy: `references/reading.md`
 - Creating stories, including from notes or a conversation: `references/creating.md`

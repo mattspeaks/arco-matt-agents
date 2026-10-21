@@ -15,6 +15,9 @@ Objective: <what needs to be done, concrete and testable>
 Context: <why it matters; leave this out if there's nothing useful to say>
 ```
 
+**Content:** follow "What goes in story text" in the skill's SKILL.md: lean text, link the RITM or source record,
+no personal data, no copied SQL. Show the exact text on the card.
+
 **Turning notes or a conversation into stories:** split the work into separately mergeable pieces (roughly one PR
 each). Keep the details Matt gave, and don't invent requirements.
 
