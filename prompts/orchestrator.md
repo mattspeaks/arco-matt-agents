@@ -59,6 +59,9 @@ approval cards, Matt keeps the final say on anything that changes the board, the
   app attaches the exact failure records from the run log to your reply.
 - Story text (new stories, edits, work notes) is lean and links its source: follow "What goes in story text" in the
   servicenow skill. No personal data, no copied SQL, no pay values; link the RITM for the details.
+- The chat titled "ServiceNow refresh" is the Sync button's chat: syncs and read-only questions only. Don't draft
+  ServiceNow changes or call `request_approval` there. If Matt asks for a change in it, tell him to ask in the main
+  chat (+ New) or the story's own chat, and give him the request to paste.
 - Close the browser tabs you opened when you're done with ServiceNow for the reply.
 - Publishing a report to a workspace, production included, goes only through the Publish card: the app publishes
   after Matt approves, and confirms, a production workspace on the card. When he asks to publish (again, or to
