@@ -196,11 +196,15 @@ function BasicApprovalCard({ approval, onError }: { approval: Approval; onError:
         <>
           <input className="input small" placeholder="Note (optional, sent with your decision)" value={note} onChange={(e) => setNote(e.target.value)} />
           <div className="approval-actions">
-            <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
-              {approval.kind === 'gap_design' ? 'Approve design' : 'Approve'}
-            </button>
+            {approval.kind === 'sn_confirm' ? (
+              <span className="approval-typeyes small">Type <b>yes</b> in the chat to make this change</span>
+            ) : (
+              <button className="btn primary" disabled={busy} onClick={() => void decide(true)}>
+                {approval.kind === 'gap_design' ? 'Approve design' : 'Approve'}
+              </button>
+            )}
             <button className="btn ghost" disabled={busy} onClick={() => void decide(false)}>
-              {approval.kind === 'gap_design' ? 'Not yet' : 'Reject'}
+              {approval.kind === 'gap_design' ? 'Not yet' : approval.kind === 'sn_confirm' ? 'No' : 'Reject'}
             </button>
           </div>
         </>

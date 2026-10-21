@@ -1,7 +1,7 @@
 import { query, queryOne } from './db/index.js';
 import { createApproval, getApproval, type Approval } from './approvals.js';
 import { publish } from './bus.js';
-import { postApprovalCard, sendMessage } from './orchestrator.js';
+import { CONFIRM_SN, postApprovalCard, sendMessage } from './orchestrator.js';
 
 // The Timesheet card: Matt types the hours to add for a story against this week's days. His Add click starts a chat
 // turn that adds them in ServiceNow (servicenow skill, timesheet recipe), so the card is the preview and the approval.
@@ -91,10 +91,11 @@ export async function decideTimeEntry(approval: Approval, approve: boolean, hour
   await sendMessage(
     p.conversationId,
     [
-      `Yes, add time to my timesheet for ${p.storyNumber} (week of ${p.weekStart}): ${entries.map((e) => `${dayLabel(p.weekStart, e.i)} +${e.add}h`).join(', ')}. That's ${total}h in all.`,
-      `Use the servicenow skill's timesheet recipe. Read my live row for ${p.storyNumber} this week, add these hours to what's already there (if there's no row, add one with category Task work), and keep each day at 24h or less. Then resync the timesheet and tell me the new totals.`,
+      `Add time to my timesheet for ${p.storyNumber} (week of ${p.weekStart}): ${entries.map((e) => `${dayLabel(p.weekStart, e.i)} +${e.add}h`).join(', ')}. That's ${total}h in all.`,
+      `Use the servicenow skill's timesheet recipe. Read my live row for ${p.storyNumber} this week and work out the new values (add to what's already there; if there's no row, add one with category Task work; each day 24h or less).`,
+      CONFIRM_SN,
+      'After the write, resync the timesheet and tell me the new totals.',
     ].join(' '),
-    { answersApprovalId: approval.id },
   );
   return `Approved: adding ${total}h`;
 }

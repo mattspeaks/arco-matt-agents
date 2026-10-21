@@ -7,7 +7,7 @@ import { query, queryOne } from '../db/index.js';
 import { createApproval, getApproval, setOutcome, supersedeChatApprovals, type Approval } from '../approvals.js';
 import { cancelClaudeRun } from '../claude/runner.js';
 import { publish } from '../bus.js';
-import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
+import { CONFIRM_SN, getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
 import { createRun, getRun, parseMeta, type Run } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { askTimeEntry } from '../timesheet.js';
@@ -685,8 +685,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     assertNotActive(story, await getFlow(story));
     await sendMessage(
       p.conversationId,
-      `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress now with the work note from the card, then resync. The app is setting up the branch and running the builder/QC loop, and posts progress here.`,
-      { answersApprovalId: approval.id },
+      `I approved the start card: ${approval.title}${withNote}. The app is setting up the branch and running the builder/QC loop, and posts progress here. ${story} should move to Work in progress with the work note from the card. ${CONFIRM_SN}`,
     );
     const data: FlowData = {
       conversationId: p.conversationId,
@@ -724,8 +723,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     }
     await sendMessage(
       p.conversationId,
-      `Not ready${note ? `: ${note}` : ''}. Move ${story} back to Work in progress (authorised by the Review card), then resync. Then interview me, one focused round of questions at a time, until you have the complete list of changes. When you have it, call submit_revision with the changes and the acceptance-criteria text.`,
-      { answersApprovalId: approval.id },
+      `Not ready${note ? `: ${note}` : ''}. ${story} should go back to Work in progress: ${CONFIRM_SN} After that, interview me, one focused round of questions at a time, until you have the complete list of changes. When you have it, call submit_revision with the changes and the acceptance-criteria text.`,
     );
     await saveFlow(story, 'revising', flow.data);
     return 'Not ready: the orchestrator will ask what to change';
@@ -739,8 +737,7 @@ export async function decideFlowCard(approval: Approval, approve: boolean, note?
     assertNotActive(story, flow);
     await sendMessage(
       p.conversationId,
-      `Yes, go ahead: ${approval.title}${withNote}. Move ${story} to Work in progress if it isn't already${p.acceptanceCriteria ? ', add the new acceptance criteria from the card' : ''}, then resync. The app is running the builder/QC loop with these changes.`,
-      { answersApprovalId: approval.id },
+      `I approved the rebuild: ${approval.title}${withNote}. The app is running the builder/QC loop with these changes. In ServiceNow, ${story} should be in Work in progress${p.acceptanceCriteria ? ' with the new acceptance criteria from the card' : ''}; if anything there needs changing, ${CONFIRM_SN.charAt(0).toLowerCase()}${CONFIRM_SN.slice(1)}`,
     );
     const data: FlowData = {
       ...flow.data,
@@ -1097,14 +1094,12 @@ export async function openForReview(story: string, approvalId?: string): Promise
     await sendMessage(
       d.conversationId,
       [
-        `I'm opening ${story} in Power BI Desktop to review it. Move ${story} to Ready for testing now (authorised by the Review card) with a work note in the standard format, then resync. Use these details:`,
+        `I'm opening ${story} in Power BI Desktop to review it. ${story} should move to Ready for testing with a work note in the standard format. ${CONFIRM_SN} Use these details:`,
         `- Summary: ${(d.lastBuilder ?? '').slice(0, 1200)}`,
         `- QC result: ${d.lastQc?.verdict ?? 'not run'}: ${(d.lastQc?.result ?? '').split('\n').slice(0, 3).join(' ').slice(0, 400)}`,
         `- Branch/PR: ${d.branch} (PR opens when I approve publishing)`,
         `- Needs: Matt's review in Power BI Desktop`,
       ].join('\n'),
-      // The Review card itself authorises this move; older flows fall back to their start/rebuild card.
-      { answersApprovalId: approvalId ?? d.permitApprovalId },
     );
   } catch {
     return { opened: pbip, laneMove: 'chat_busy' };

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { config, REPO_ROOT } from '../config.js';
 import { query, queryOne } from '../db/index.js';
 import { createApproval, type Approval } from '../approvals.js';
-import { getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
+import { CONFIRM_SN, getConversation, postApprovalCard, postAppNote, sendMessage } from '../orchestrator.js';
 import { createRun, getRun } from '../runs.js';
 import { startWorkerRun } from '../workers.js';
 import { ensureCatalog } from '../dwh/catalog.js';
@@ -137,15 +137,13 @@ export async function decideGapDesign(approval: Approval, approve: boolean, note
         '2. For each fact I stated about our data (what something really is, a source we will never use, what a column means), propose a lesson with propose_lesson, worker "arco-data", one per fact, so every data bot remembers it.',
         '3. Then call start_gap_design again. The app gives the designer the previous design and this feedback.',
       ].join('\n'),
-      { answersApprovalId: approval.id },
     );
     return 'Not approved: feedback sent; the designer reruns with it';
   }
   const mappings = JSON.parse(p.mappings || '[]') as GapMapping[];
   await sendMessage(
     p.conversationId,
-    `Yes, I approve the gap design${note ? ` (${note})` : ''}. Add it to ${p.storyNumber} in ServiceNow as a work note: the full proposal, or if it's very long, the summary plus each proposal's one-line headline. Then resync.${mappings.length && p.originStory ? ` The app is sending the ${mappings.length} approved name mapping(s) to ${p.originStory}.` : ''}`,
-    { answersApprovalId: approval.id },
+    `I approve the gap design${note ? ` (${note})` : ''}. It goes on ${p.storyNumber} in ServiceNow as a work note: the full proposal, or if it's very long, the summary plus each proposal's one-line headline. ${CONFIRM_SN} Then resync.${mappings.length && p.originStory ? ` The app is sending the ${mappings.length} approved name mapping(s) to ${p.originStory}.` : ''}`,
   );
   if (mappings.length && p.originStory) {
     const origin = await getFlow(p.originStory);

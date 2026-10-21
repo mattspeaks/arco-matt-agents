@@ -4,7 +4,7 @@ import { bus } from './bus.js';
 import { config } from './config.js';
 import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
-import { createApproval, decide, getApproval, listApprovals, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
+import { confirmByTypedYes, createApproval, decide, getApproval, isPlainYes, listApprovals, pendingPreview, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
 import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestPublish, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
 import { archiveConversation, createConversation, endDeadTurn, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
@@ -130,7 +130,11 @@ app.post<{ Params: { number: string } }>('/api/stories/:number/close', async (re
 app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations/:id/messages', async (req) => {
   const text = req.body?.text?.trim();
   if (!text) throw bad('text is required');
-  return sendMessage(req.params.id, text);
+  // Like the shared agile-board skill: Matt confirms a ServiceNow preview by typing yes himself. That turn may write.
+  const preview = isPlainYes(text) ? await pendingPreview(req.params.id) : undefined;
+  const sent = await sendMessage(req.params.id, text, preview ? { answersApprovalId: preview.id } : {});
+  if (preview) await confirmByTypedYes(preview, text);
+  return sent;
 });
 
 app.get<{ Querystring: { status?: string } }>('/api/approvals', async (req) => listApprovals(req.query.status));
@@ -241,24 +245,22 @@ app.post<{ Body: AgentBody }>('/api/agent/request_approval', async (req) => {
   return {
     approval_id: approval.id,
     status: 'pending',
-    note: 'The card is in Matt\'s Approvals panel. End your turn now. If he clicks Approve, his next message is "Yes, go ahead: …" and that turn may write. A typed "yes" does not unlock writes.',
+    note: 'The preview is in the chat. End your turn now and ask Matt to type yes to confirm. If his next message is a plain yes, that turn may write exactly this change; anything else (an edit, a question) means a new preview.',
   };
 });
 
-// Asked by the write guard hook before any ServiceNow write: only the turn started by clicking Approve may write.
+// Asked by the write guard hook before any ServiceNow write: only the turn Matt started by typing yes to a preview.
 app.get<{ Querystring: { run?: string } }>('/api/agent/write_permit', async (req) => {
   const run = req.query.run ? await getRun(req.query.run) : undefined;
   if (!run) return { ok: false, reason: 'unknown run' };
   const approvalId = parseMeta<{ answersApprovalId?: string }>(run).answersApprovalId;
   const approval = approvalId ? await getApproval(approvalId) : undefined;
-  // "Not ready" on a Review card authorises moving the story back to Work in progress, so a rejected one counts too.
-  // A Review card authorises its own moves (Open → Ready for testing, Not ready → WIP) whatever its status, unless replaced.
-  const granted = approval && SN_PERMIT_KINDS.includes(approval.kind) && (approval.status === 'approved' || (approval.kind === 'pbi_review' && approval.status !== 'superseded'));
+  const granted = approval && SN_PERMIT_KINDS.includes(approval.kind) && approval.status === 'approved';
   if (granted) return { ok: true, approval: approval.title };
   return {
     ok: false,
     reason:
-      'no approved card for this turn. Call request_approval with the preview and end your turn; Matt approves it in his Approvals panel, and the turn his click starts may write. A typed "yes" does not count',
+      'no confirmed preview for this turn. Call request_approval with the exact change and end your turn; the turn Matt starts by typing yes in the chat may write',
   };
 });
 

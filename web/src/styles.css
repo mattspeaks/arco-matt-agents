@@ -393,3 +393,5 @@ pre.note {
 .chat-pick-button.waiting { animation: chat-blink-button 1.1s ease-in-out infinite; }
 @keyframes chat-blink-button { 0%, 100% { background: var(--panel); } 50% { background: var(--warn-soft); } }
 @media (prefers-reduced-motion: reduce) { .chat-pick-button.waiting { animation: none; background: var(--warn-soft); } }
+
+.approval-typeyes { align-self: center; color: var(--accent); }

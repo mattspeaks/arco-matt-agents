@@ -3,7 +3,7 @@ import { config } from './config.js';
 import { query, queryOne } from './db/index.js';
 import { publish } from './bus.js';
 import { createApproval, type Approval } from './approvals.js';
-import { archiveConversation, postApprovalCard, postAppNote, postChecklistCard, sendMessage, type Conversation } from './orchestrator.js';
+import { CONFIRM_SN, archiveConversation, postApprovalCard, postAppNote, postChecklistCard, sendMessage, type Conversation } from './orchestrator.js';
 import { waitForRun } from './runs.js';
 import { askTimeEntry } from './timesheet.js';
 import { git, pullRequestStatus, repoPath } from './pbi/repo.js';
@@ -177,8 +177,7 @@ export async function decideClose(approval: Approval, approve: boolean): Promise
   const story = p.storyNumber;
   const { runId } = await sendMessage(
     p.conversationId,
-    `Yes, close out ${story}: add this final work note to ${story} in ServiceNow (don't change its lane), then resync.\n\n\`\`\`\n${p.workNote}\n\`\`\``,
-    { answersApprovalId: approval.id },
+    `Close out ${story}: it needs this final work note in ServiceNow (don't change its lane). ${CONFIRM_SN} Then resync.\n\n\`\`\`\n${p.workNote}\n\`\`\``,
   );
   await query('UPDATE dbo.story_checklists SET closed_at = SYSUTCDATETIME() WHERE story_number = ?', [story]);
   publish('checklist', await load(story));

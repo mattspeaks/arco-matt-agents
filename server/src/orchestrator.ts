@@ -42,6 +42,9 @@ const SESSION_SETTINGS = {
     Stop: [{ hooks: [{ type: 'command', command: `"${NODE}" "${RESYNC_CHECK}"` }] }],
   },
 };
+/** Appended to card-click messages that lead to a ServiceNow change: Matt confirms it by typing yes, never by a click. */
+export const CONFIRM_SN = "Preview the exact ServiceNow change with request_approval and end your turn; I'll type yes in the chat to confirm, and only then make it.";
+
 const busy = new Map<string, string>(); // conversationId -> runId
 
 export async function createConversation(title = 'New conversation', storyNumber?: string): Promise<Conversation> {
@@ -281,7 +284,7 @@ export async function sendMessage(
     publish('conversation', await getConversation(conversationId));
   }
 
-  // answersApprovalId marks the turn Matt started by clicking Approve: the only turn allowed to write (write_permit).
+  // answersApprovalId marks the turn Matt started by typing yes to a ServiceNow preview: the only turn that may write.
   const run = await createRun({
     kind: opts.kind ?? 'orchestrator',
     title: text.slice(0, 120),

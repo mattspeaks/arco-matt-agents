@@ -65,9 +65,9 @@ window.SN = async (path, opts = {}) => {
 - **Write the HTTP method literally** (`method: 'PATCH'`) so the change is obvious to anyone reading it.
 - **Writes = resolve → approval card → Matt's Approve → re-check → write → verify → resync.** See `references/writing.md`.
   For the preview, **always call `mcp__arco__request_approval`** (title + markdown preview), which puts an
-  Approve / Reject card in Matt's Approvals panel, then **end your turn**. Don't ask "yes or no?" in text. When he
-  clicks Approve, his next message is "Yes, go ahead: …", and only that turn can write: the app's guard blocks
-  writes anywhere else, including after a typed "yes". If he rejects, or anything changes, prepare a new preview.
+  preview card in the chat, ask Matt to type **yes** to confirm, then **end your turn**. If his next message is a plain
+  "yes", only that turn can write, and only what the preview showed: the app's guard blocks writes anywhere else.
+  If he says no, edits anything, or asks a question, prepare a new preview.
   One card can cover a batch.
 - **Always finish a write by re-running the matching snapshot** from `references/reading.md`: the story snapshot after a
   story change (the board snapshot too if you created a story or changed a sprint), the timesheet after an hours change. That's how the app's local copy updates. The app won't let the

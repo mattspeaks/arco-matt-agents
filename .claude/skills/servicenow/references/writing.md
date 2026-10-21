@@ -3,7 +3,7 @@
 Every write: resolve → preview → Matt's explicit "yes" → re-check → write → verify → resync.
 
 - Preview with `mcp__arco__request_approval` (title + markdown preview), then end your turn. Never ask for a yes in
-  text. Write only in the turn started by Matt clicking Approve ("Yes, go ahead: …"); the app's guard blocks writes in
+  text. Write only in the turn started by Matt typing "yes" to the preview; the app's guard blocks writes in
   any other turn. One card can cover a batch that was previewed together. If anything changes, preview again.
 - Edited fields and work notes follow "What goes in story text" in SKILL.md: link the source record, no personal
   data, no pasted SQL or scripts.
@@ -60,7 +60,7 @@ moves and add the work notes above. Never change `assignment_group` (the guard o
    - For `description` and `acceptance_criteria`, show the full new text exactly as it will be saved. If Matt asked
      to add to them, keep the existing text and append; say "appends" or "replaces" in the table.
    - One card can cover several fields, or several stories edited together.
-3. After "Yes, go ahead": check that nothing changed since the preview, then PATCH only the previewed fields. These
+3. After Matt's "yes": check that nothing changed since the preview, then PATCH only the previewed fields. These
    two text fields are HTML in ServiceNow, so turn line breaks into `<br>` (or keep the existing HTML when you
    append):
 

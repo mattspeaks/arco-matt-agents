@@ -6,7 +6,7 @@
 //   - never change the time_sheet record or a time card's state (submitting is Matt's)
 //   - a story's assignment_group can only ever be the team's group (config: servicenow.assignmentGroup)
 //   - no form submits from script
-//   - only in the turn Matt started by clicking Approve on an approval card (asks the app: /api/agent/write_permit)
+//   - only in the turn Matt started by typing yes to a ServiceNow preview card (asks the app: /api/agent/write_permit)
 // Exit 2 blocks the call and shows the reason to Claude. Reads pass straight through.
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -82,7 +82,7 @@ process.stdin.on('end', () => {
   for (const s of states) if (!laneSet.has(s)) block(creatingStory ? `a new story may only start in states ${[...createStates].join(', ')}` : `story state ${s} is Matt's lane; agents may only set ${[...allowedStates].join(', ')}`);
   if (tables.has('rm_story') && /['"]?\bstate['"]?\s*:\s*[^'"`\-\d\s]/.test(checked)) block('write story state as a literal value so it can be checked');
 
-  // Writes only happen in the turn Matt started by clicking Approve on the card (request_approval).
+  // Writes only happen in the turn Matt started by typing yes to the preview (request_approval).
   const api = process.env.ARCO_API ?? 'http://127.0.0.1:4317';
   const runId = process.env.ARCO_RUN_ID;
   if (!runId) block('no app run id, so the approval can\'t be checked');

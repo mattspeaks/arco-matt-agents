@@ -13,7 +13,31 @@ import { startWorkerRun } from './workers.js';
 export type ApprovalKind = 'start_worker' | 'sn_write' | 'timesheet_write' | 'sn_confirm' | 'lesson' | 'pbi_start' | 'pbi_review' | 'pbi_revise' | 'pbi_publish' | 'pbi_gaps' | 'pbi_proceed' | 'time_entry' | 'story_close' | 'gap_design';
 
 /** Cards whose click starts a chat turn that may write to ServiceNow (see /api/agent/write_permit). */
-export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm', 'pbi_start', 'pbi_review', 'pbi_revise', 'time_entry', 'story_close', 'gap_design'];
+// Only a ServiceNow preview (sn_confirm) that Matt confirmed by typing yes in the chat unlocks a write. Other cards
+// start work in the app; when that work needs a ServiceNow change, the orchestrator previews it and Matt types yes.
+export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm'];
+
+/** Matt's own message is a plain yes ("yes", "yes please", "go ahead", "do it"), with nothing else to change. */
+export function isPlainYes(text: string): boolean {
+  return /^\s*(yes|y|yep|yeah|yup|ok|okay|go ahead|do it|confirm(ed)?|approved?|sounds good)([\s,.!]+(please|go ahead|do it|thanks|thank you))*[\s.!]*$/i.test(text);
+}
+
+/** The chat's pending ServiceNow preview, if any (request_approval keeps at most one per chat). */
+export async function pendingPreview(conversationId: string): Promise<Approval | undefined> {
+  return queryOne<Approval>(
+    `SELECT TOP 1 * FROM dbo.approvals WHERE kind = 'sn_confirm' AND status = 'pending' AND JSON_VALUE(payload, '$.conversationId') = ? ORDER BY created_at DESC`,
+    [conversationId],
+  );
+}
+
+/** Matt typed yes in the chat: the preview is confirmed, by him, in his own words. */
+export async function confirmByTypedYes(approval: Approval, text: string) {
+  await query("UPDATE dbo.approvals SET status = 'approved', decision_note = ?, outcome = 'Confirmed by Matt typing yes in the chat', decided_at = SYSUTCDATETIME() WHERE id = ? AND status = 'pending'", [
+    `Typed: "${text.slice(0, 80)}"`,
+    approval.id,
+  ]);
+  publish('approval', (await getApproval(approval.id))!);
+}
 const FLOW_KINDS: ApprovalKind[] = ['pbi_start', 'pbi_review', 'pbi_revise', 'pbi_publish', 'pbi_gaps', 'pbi_proceed'];
 
 export interface Approval {
@@ -140,6 +164,8 @@ export async function decide(
   }
 
   if (approval.kind === 'sn_confirm') {
+    // A ServiceNow change is confirmed only by Matt typing yes in the chat. The card can still say no.
+    if (approve) throw Object.assign(new Error('Type yes in the chat to confirm this ServiceNow change'), { statusCode: 400 });
     // Answer first: if the chat is busy, this throws and the card stays pending.
     const { conversationId, title } = JSON.parse(approval.payload) as { conversationId: string; title: string };
     const reply = approve

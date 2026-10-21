@@ -83,7 +83,7 @@ Possible duplicate: STRY00xxxxx "…" (Ready)
 
 If Matt says "dry run" or "draft only", stop after showing the preview in chat, and don't call request_approval.
 
-## 4. Create: only in the turn started by Matt's Approve ("Yes, go ahead: …")
+## 4. Create: only in the turn started by Matt typing "yes" to the preview
 
 Create in a call of its own: no updates to existing stories in the same snippet. Remove the dashes from the sys_ids.
 Create sequentially. If one fails, stop and report which were created; don't retry blindly.
