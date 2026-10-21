@@ -4,10 +4,10 @@ import { bus } from './bus.js';
 import { config } from './config.js';
 import { cancelClaudeRun } from './claude/runner.js';
 import { initDb, query } from './db/index.js';
-import { confirmByTypedYes, createApproval, decide, getApproval, isPlainYes, listApprovals, pendingPreview, SN_PERMIT_KINDS, supersedeChatApprovals } from './approvals.js';
+import { confirmByTypedYes, createApproval, decide, getApproval, listApprovals, pendingPreview, SN_PERMIT_KINDS, supersedeChatApprovals, yesReply } from './approvals.js';
 import { attachReportWork, flowSummary, getFlow, listFabric, listRepoReports, openForReview, proposeReportWork, publishOptions, publishTargets, recoverInterruptedFlows, requestPublish, requestReview, stopReportWork, submitRevision } from './pbi/flow.js';
 import { proposeLesson } from './lessons.js';
-import { archiveConversation, createConversation, endDeadTurn, getConversation, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
+import { archiveConversation, createConversation, endDeadTurn, getConversation, postAppNote, getMessages, listConversations, openStoryConversation, postApprovalCard, requestRefresh, sendMessage } from './orchestrator.js';
 import { getRun, listRunEvents, listRuns, parseMeta, recoverInterruptedRuns, updateRun, waitForRun, withoutBodies, type Run } from './runs.js';
 import { getCurrentTimesheet, getLanes, getSprintScore, getStory, getTimesheet, lastSyncAt, listStories } from './servicenow/store.js';
 import { listWorkers, requestWorker } from './workers.js';
@@ -131,9 +131,17 @@ app.post<{ Params: { id: string }; Body: { text: string } }>('/api/conversations
   const text = req.body?.text?.trim();
   if (!text) throw bad('text is required');
   // Like the shared agile-board skill: Matt confirms a ServiceNow preview by typing yes himself. That turn may write.
-  const preview = isPlainYes(text) ? await pendingPreview(req.params.id) : undefined;
+  // The app always says what it did with the reply while a preview is waiting, so a yes that didn't count is visible.
+  const waiting = await pendingPreview(req.params.id);
+  const answer = waiting ? yesReply(text) : 'other';
+  const preview = answer === 'yes' ? waiting : undefined;
   const sent = await sendMessage(req.params.id, text, preview ? { answersApprovalId: preview.id } : {});
-  if (preview) await confirmByTypedYes(preview, text);
+  if (preview) {
+    await confirmByTypedYes(preview, text);
+    await postAppNote(req.params.id, `✓ Your "yes" confirmed the ServiceNow change: **${preview.title}**. This turn may make exactly that change.`);
+  } else if (waiting && answer === 'qualified') {
+    await postAppNote(req.params.id, `Your reply didn't confirm the ServiceNow change (**${waiting.title}**) because it asks for something different. The orchestrator will show a new preview; reply **yes** to that one.`);
+  }
   return sent;
 });
 

@@ -19,7 +19,18 @@ export const SN_PERMIT_KINDS: ApprovalKind[] = ['sn_confirm'];
 
 /** Matt's own message is a plain yes ("yes", "yes please", "go ahead", "do it"), with nothing else to change. */
 export function isPlainYes(text: string): boolean {
-  return /^\s*(yes|y|yep|yeah|yup|ok|okay|go ahead|do it|confirm(ed)?|approved?|sounds good)([\s,.!]+(please|go ahead|do it|thanks|thank you))*[\s.!]*$/i.test(text);
+  return yesReply(text) === 'yes';
+}
+
+/**
+ * How Matt's reply answers a pending ServiceNow preview: 'yes' (it starts with an affirmation and asks for nothing
+ * different), 'qualified' (it starts like a yes but asks for a change or a question), or 'other' (not an answer).
+ */
+export function yesReply(text: string): 'yes' | 'qualified' | 'other' {
+  const t = text.trim();
+  if (!/^(yes|yep|yeah|yup|y|ok|okay|sure|go ahead|do it|confirm(ed)?|approved?|i approve|i confirm|sounds good|looks good|lgtm)\b/i.test(t)) return 'other';
+  if (/\?|\b(but|except|instead|change|changed|make it|rather|actually|don'?t|do not|not|no|wait|hold|only|also|plus|first)\b/i.test(t)) return 'qualified';
+  return 'yes';
 }
 
 /** The chat's pending ServiceNow preview, if any (request_approval keeps at most one per chat). */
